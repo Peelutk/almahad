@@ -13,7 +13,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "almahad",
+      "database_name": "db_almahad",
       "database_id": "0a95fda8-2dd8-4fd3-bff4-31bbea81ee5a"
     }
   ],
