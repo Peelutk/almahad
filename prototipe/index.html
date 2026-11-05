@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Al-Ma'had — Prototipe</title>
+<style>
+/* ===== Token warna (dari logo: #00A859 hijau tua, #88C44A hijau muda) ===== */
+:root{
+  --merek:#00A859; --merek-muda:#88C44A;
+  --utama:#007A41;          /* tombol & tautan (kontras cukup di latar terang) */
+  --utama-teks:#FFFFFF;
+  --utama-lembut:#E6F5EC;
+  --muda-lembut:#EFF7E4;
+  --latar:#F6F8F6; --kartu:#FFFFFF; --garis:#DCE3DE;
+  --teks:#16211B; --teks-2:#5A6A60;
+  --bahaya:#B42318; --bahaya-lembut:#FDECEA;
+  --peringatan:#8A5A00; --peringatan-lembut:#FFF4DB;
+  --info:#1D5FA8; --info-lembut:#E7F0FB;
+  --bayang:0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --utama:#2BC17A; --utama-teks:#04140B;
+    --utama-lembut:#0E2A1C; --muda-lembut:#1B2A12;
+    --latar:#0E1411; --kartu:#161E19; --garis:#26322B;
+    --teks:#E6EEE9; --teks-2:#9AAAA0;
+    --bahaya:#FF8A80; --bahaya-lembut:#3A1714;
+    --peringatan:#F5C451; --peringatan-lembut:#33280C;
+    --info:#7FB4F0; --info-lembut:#132538;
+    --bayang:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--latar);color:var(--teks);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--utama)}
+button,input,select,textarea{font:inherit;color:inherit}
+.logo{width:36px;height:36px;border-radius:50%;flex:none}
+
+/* ===== Kerangka ===== */
+.atas{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--kartu);border-bottom:1px solid var(--garis)}
+.atas b{font-size:17px}
+.atas .sela{flex:1}
+.menu-btn{display:none;background:none;border:1px solid var(--garis);border-radius:8px;padding:6px 10px;cursor:pointer}
+.tata{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 57px)}
+nav{background:var(--kartu);border-right:1px solid var(--garis);padding:12px 8px}
+nav a{display:block;padding:8px 12px;border-radius:8px;text-decoration:none;color:var(--teks);margin-bottom:2px}
+nav a:hover{background:var(--latar)}
+nav a.aktif{background:var(--utama-lembut);color:var(--utama);font-weight:600}
+nav .judul{font-size:12px;color:var(--teks-2);padding:12px 12px 4px;text-transform:uppercase;letter-spacing:.04em}
+main{padding:20px 16px;max-width:1000px;width:100%}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--teks-2);margin:0 0 18px}
+@media (max-width:760px){
+  .tata{grid-template-columns:minmax(0,1fr)}
+  nav{display:none;border-right:0;border-bottom:1px solid var(--garis)}
+  nav.buka{display:block}
+  .menu-btn{display:inline-block}
+  .atas{flex-wrap:wrap;row-gap:6px}
+  .peran-pilih{order:9;width:100%}
+  main{min-width:0}
+}
+
+/* ===== Komponen ===== */
+.kartu{background:var(--kartu);border:1px solid var(--garis);border-radius:12px;padding:16px;box-shadow:var(--bayang);margin-bottom:14px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:14px}
+.angka{font-size:28px;font-weight:700;color:var(--utama)}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--garis);background:var(--kartu);border-radius:8px;padding:7px 14px;cursor:pointer;text-decoration:none;color:var(--teks)}
+.btn:hover{border-color:var(--utama)}
+.btn.utama{background:var(--utama);border-color:var(--utama);color:var(--utama-teks)}
+.btn.bahaya{color:var(--bahaya);border-color:var(--bahaya)}
+.btn.kecil{padding:3px 10px;font-size:13px}
+.baris{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.baris.antara{justify-content:space-between}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--garis);vertical-align:top}
+th{font-size:13px;color:var(--teks-2);font-weight:600}
+.tabel-wadah{overflow-x:auto}
+.lencana{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.l-draf{background:var(--latar);color:var(--teks-2);border:1px solid var(--garis)}
+.l-diajukan{background:var(--info-lembut);color:var(--info)}
+.l-revisi{background:var(--peringatan-lembut);color:var(--peringatan)}
+.l-lolos{background:var(--muda-lembut);color:var(--utama)}
+.l-terbit{background:var(--utama);color:var(--utama-teks)}
+.l-ditolak{background:var(--bahaya-lembut);color:var(--bahaya)}
+.l-telat{background:var(--bahaya-lembut);color:var(--bahaya)}
+.l-peran{background:var(--utama-lembut);color:var(--utama)}
+label{display:block;font-size:13px;color:var(--teks-2);margin:10px 0 4px}
+input[type=text],input[type=date],input[type=url],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--garis);border-radius:8px;background:var(--kartu)}
+textarea{min-height:220px;resize:vertical}
+input:focus,select:focus,textarea:focus,.btn:focus-visible,nav a:focus-visible{outline:2px solid var(--merek);outline-offset:1px}
+.dua{display:grid;grid-template-columns:2fr 1fr;gap:14px}
+@media (max-width:760px){.dua{grid-template-columns:minmax(0,1fr)}}
+.riwayat{list-style:none;padding:0;margin:0}
+.riwayat li{border-left:3px solid var(--merek-muda);padding:2px 0 10px 12px;margin-left:4px}
+.riwayat small{color:var(--teks-2)}
+.tab{display:flex;gap:4px;border-bottom:1px solid var(--garis);margin-bottom:12px}
+.tab button{background:none;border:0;padding:8px 12px;cursor:pointer;border-bottom:2px solid transparent;color:var(--teks-2)}
+.tab button.aktif{border-color:var(--utama);color:var(--utama);font-weight:600}
+.peran-pilih{display:flex;gap:6px;flex-wrap:wrap;font-size:13px}
+.peran-pilih label{display:inline-flex;gap:4px;align-items:center;margin:0;color:var(--teks)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--teks);color:var(--latar);padding:8px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none}
+.toast.ada{opacity:1}
+.kosong{color:var(--teks-2);text-align:center;padding:24px}
+.catatan-proto{font-size:12px;color:var(--teks-2);border:1px dashed var(--garis);border-radius:8px;padding:6px 10px;margin-bottom:14px}
+
+/* ===== Halaman masuk ===== */
+.masuk{min-height:100vh;display:grid;place-items:center;padding:16px}
+.masuk .kartu{max-width:360px;text-align:center;padding:32px 24px}
+.masuk .logo{width:96px;height:96px;margin-bottom:12px}
+.g-btn{width:100%;justify-content:center;margin-top:16px}
+
+/* ===== Halaman cetak (seperti dokumen) ===== */
+.kertas{background:#fff;color:#111;max-width:794px;margin:0 auto;padding:56px 64px;box-shadow:0 2px 12px rgba(0,0,0,.15);font-family:Georgia,"Times New Roman",serif;line-height:1.7}
+.kertas h2{font-family:system-ui,sans-serif;color:#007A41;border-bottom:2px solid #88C44A;padding-bottom:4px;margin-top:32px}
+.kertas h3{margin:20px 0 2px}
+.kertas .meta{font-size:13px;color:#555;font-family:system-ui,sans-serif}
+.kertas .sampul{text-align:center;margin-bottom:24px}
+.kertas .sampul img{width:90px;height:90px;border-radius:50%}
+@media print{
+  .atas,nav,.cetak-alat,.catatan-proto{display:none!important}
+  .tata{display:block}
+  main{padding:0;max-width:none}
+  body{background:#fff}
+  .kertas{box-shadow:none;padding:0;max-width:none}
+  .kertas h2{break-after:avoid}
+  .kertas article{break-inside:avoid-page}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== DATA CONTOH (prototipe, bukan data asli) ================== */
+const D = {
+  anggota: [
+    {id:1, nama:'Ahmad Fauzi', email:'ahmad@daarululuumlido.com', kelas:'XI', peran:['pemred'], status:'aktif'},
+    {id:2, nama:'Rizki Maulana', email:'rizki@daarululuumlido.com', kelas:'XI', peran:['editor','admin'], status:'aktif'},
+    {id:3, nama:'Salman Hakim', email:'salman@daarululuumlido.com', kelas:'X', peran:['reporter'], status:'aktif'},
+    {id:4, nama:'Yusuf Ramadhan', email:'yusuf@daarululuumlido.com', kelas:'X', peran:['reporter'], status:'aktif'},
+    {id:5, nama:'Hasan Basri', email:'hasan@daarululuumlido.com', kelas:'XII', peran:['editor'], status:'arsip'},
+  ],
+  pilihan: {
+    rubrik_berita: [{n:'Kegiatan Pondok',a:1},{n:'Prestasi',a:1},{n:'Olahraga',a:1},{n:'Pengumuman',a:0}],
+    rubrik_majalah: [{n:'Laporan Utama',a:1},{n:'Opini',a:1},{n:'Sosok',a:1},{n:'Sastra',a:1},{n:'Kajian',a:1}],
+  },
+  tugas: [
+    {id:1, judul:'Liputan lomba pidato 3 bahasa', jenis:'berita', rubrik:'Kegiatan Pondok', pemberi:'Rizki Maulana', reporter:'Salman Hakim', tenggat:'2026-11-03', status:'dikerjakan'},
+    {id:2, judul:'Wawancara juara olimpiade sains', jenis:'majalah', rubrik:'Sosok', pemberi:'Ahmad Fauzi', reporter:'Yusuf Ramadhan', tenggat:'2026-11-12', status:'baru'},
+    {id:3, judul:'Pertandingan futsal antarkelas', jenis:'berita', rubrik:'Olahraga', pemberi:'Rizki Maulana', reporter:'Salman Hakim', tenggat:'2026-11-08', status:'selesai'},
+  ],
+  naskah: [
+    {id:1, jenis:'berita', judul:'Santri Kelas X Raih Juara Futsal', rubrik:'Olahraga', penulis:'Salman Hakim', status:'diajukan', diubah:'05-11-2026', tugas:3},
+    {id:2, jenis:'majalah', judul:'Menjaga Bahasa di Era Gawai', rubrik:'Opini', penulis:'Yusuf Ramadhan', status:'lolos', diubah:'04-11-2026'},
+    {id:3, jenis:'majalah', judul:'Sang Penghafal dari Ujung Timur', rubrik:'Sosok', penulis:'Salman Hakim', status:'terbit', diubah:'01-11-2026'},
+    {id:4, jenis:'majalah', judul:'Setahun Asrama Baru', rubrik:'Laporan Utama', penulis:'Ahmad Fauzi', status:'terbit', diubah:'30-10-2026'},
+    {id:5, jenis:'berita', judul:'Pembukaan Pekan Bahasa', rubrik:'Kegiatan Pondok', penulis:'Yusuf Ramadhan', status:'revisi', diubah:'03-11-2026'},
+    {id:6, jenis:'berita', judul:'Kunjungan Studi ke Percetakan', rubrik:'Kegiatan Pondok', penulis:'Salman Hakim', status:'draf', diubah:'05-11-2026'},
+  ],
+  edisi: [
+    {id:1, nomor:'No. 12', tema:'Bahasa dan Identitas', bulan:'Desember 2026', status:'disusun', naskah:[4,3]},
+    {id:2, nomor:'No. 11', tema:'Awal Tahun Ajaran', bulan:'Agustus 2026', status:'terbit', naskah:[]},
+  ],
+};
+const HARI_INI = '2026-11-05';
+const STATUS = {draf:['Draf','l-draf'], diajukan:['Diajukan','l-diajukan'], revisi:['Revisi','l-revisi'], lolos:['Lolos Editor','l-lolos'], terbit:['Terbit','l-terbit'], ditolak:['Ditolak','l-ditolak']};
+const ISI_CONTOH = 'Tim futsal kelas X berhasil menjuarai turnamen antarkelas yang digelar di lapangan utama pondok, Sabtu (1/11).\n\nPertandingan final berlangsung ketat ...';
+
+/* ================== PERAN (pratinjau) ================== */
+let peran = new Set(['reporter','editor','pemred','admin']);
+const punya = (...p) => p.some(x => peran.has(x));
+
+/* ================== PEMBANTU ================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lencana = st => `<span class="lencana ${STATUS[st][1]}">${STATUS[st][0]}</span>`;
+const tgl = s => s.split('-').reverse().join('-');
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('ada'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('ada'),2200); }
+const proto = () => toast('Prototipe: tombol ini belum berfungsi');
+const LOGO = '../aset/logo-bulat.jpg';
+
+/* ================== HALAMAN ================== */
+const H = {};
+
+H.masuk = () => `
+<div class="masuk"><div class="kartu">
+  <img class="logo" src="${LOGO}" alt="Logo Al-Ma'had">
+  <h1>Al-Ma'had</h1>
+  <p class="sub">Sistem redaksi organisasi jurnalistik</p>
+  <a class="btn utama g-btn" href="#dasbor">Masuk dengan Google</a>
+  <p class="sub" style="margin-top:12px;font-size:13px">Hanya email <b>@daarululuumlido.com</b> yang terdaftar sebagai anggota.</p>
+</div></div>`;
+
+H.dasbor = () => {
+  const tugasSaya = D.tugas.filter(t=>t.reporter==='Salman Hakim' && t.status!=='selesai');
+  const perluSunting = D.naskah.filter(n=>n.status==='diajukan').length;
+  const perluSetuju = D.naskah.filter(n=>n.status==='lolos').length;
+  return `
+  <h1>Assalamu'alaikum 👋</h1><p class="sub">Ringkasan pekerjaan redaksi hari ini.</p>
+  <div class="grid">
+    ${punya('reporter')?`<a class="kartu" href="#tugas" style="text-decoration:none;color:inherit"><div class="angka">${tugasSaya.length}</div>Tugas saya berjalan</a>`:''}
+    ${punya('editor','pemred')?`<a class="kartu" href="#antrean" style="text-decoration:none;color:inherit"><div class="angka">${perluSunting}</div>Naskah perlu disunting</a>`:''}
+    ${punya('pemred')?`<a class="kartu" href="#antrean" style="text-decoration:none;color:inherit"><div class="angka">${perluSetuju}</div>Menunggu persetujuan Pemred</a>`:''}
+    ${punya('pemred')?`<a class="kartu" href="#edisi" style="text-decoration:none;color:inherit"><div class="angka">${D.edisi.filter(e=>e.status!=='terbit').length}</div>Edisi majalah disusun</a>`:''}
+  </div>
+  ${punya('reporter')?`<div class="kartu"><div class="baris antara"><b>Tugas saya</b><a href="#tugas">Semua tugas →</a></div>
+    ${tabelTugas(tugasSaya)}</div>`:''}
+  <div class="kartu"><div class="baris antara"><b>Naskah terbaru</b><a href="#naskah">Semua naskah →</a></div>
+    ${tabelNaskah(D.naskah.slice(0,4))}</div>`;
+};
+
+function terlambat(t){ return t.status!=='selesai' && t.status!=='batal' && t.tenggat < HARI_INI; }
+function tabelTugas(list){
+  if(!list.length) return '<div class="kosong">Tidak ada tugas.</div>';
+  return `<div class="tabel-wadah"><table><tr><th>Tugas</th><th>Reporter</th><th>Tenggat</th><th>Status</th></tr>
+  ${list.map(t=>`<tr><td><b>${esc(t.judul)}</b><br><small style="color:var(--teks-2)">${t.jenis==='berita'?'Berita':'Majalah'} · ${esc(t.rubrik)} · dari ${esc(t.pemberi)}</small></td>
+    <td>${esc(t.reporter)}</td><td>${tgl(t.tenggat)}</td>
+    <td>${terlambat(t)?'<span class="lencana l-telat">Terlambat</span> ':''}<span class="lencana l-draf">${t.status[0].toUpperCase()+t.status.slice(1)}</span></td></tr>`).join('')}
+  </table></div>`;
+}
+H.tugas = () => `
+  <div class="baris antara"><div><h1>Tugas Liputan</h1><p class="sub">Tugas tidak bisa ditolak; tenggat wajib diisi.</p></div>
+  ${punya('editor','pemred')?'<a class="btn utama" href="#tugas-baru">+ Beri tugas</a>':''}</div>
+  <div class="kartu">${tabelTugas(D.tugas)}</div>`;
+
+H['tugas-baru'] = () => `
+  <h1>Beri Tugas Liputan</h1><p class="sub">Hanya Editor dan Pemred.</p>
+  <div class="kartu">
+    <label>Judul tugas</label><input type="text" placeholder="mis. Liputan wisuda tahfiz">
+    <label>Keterangan</label><textarea style="min-height:90px" placeholder="Narasumber, sudut pandang, dll."></textarea>
+    <div class="grid" style="margin:0">
+      <div><label>Jenis</label><select><option>Berita</option><option>Majalah</option></select></div>
+      <div><label>Rubrik (dari Daftar Pilihan)</label><select>${D.pilihan.rubrik_berita.filter(r=>r.a).map(r=>`<option>${r.n}</option>`).join('')}</select></div>
+      <div><label>Reporter</label><select>${D.anggota.filter(a=>a.status==='aktif'&&a.peran.includes('reporter')).map(a=>`<option>${a.nama}</option>`).join('')}</select></div>
+      <div><label>Tenggat *</label><input type="date" required></div>
+    </div>
+    <div class="baris" style="margin-top:14px"><button class="btn utama" onclick="proto()">Simpan tugas</button><a class="btn" href="#tugas">Batal</a></div>
+  </div>`;
+
+function tabelNaskah(list){
+  if(!list.length) return '<div class="kosong">Tidak ada naskah.</div>';
+  return `<div class="tabel-wadah"><table><tr><th>Judul</th><th>Jenis</th><th>Penulis</th><th>Status</th></tr>
+  ${list.map(n=>`<tr><td><a href="#naskah/${n.id}"><b>${esc(n.judul)}</b></a><br><small style="color:var(--teks-2)">${esc(n.rubrik)} · diubah ${n.diubah}</small></td>
+    <td>${n.jenis==='berita'?'Berita':'Majalah'}</td><td>${esc(n.penulis)}</td><td>${lencana(n.status)}</td></tr>`).join('')}
+  </table></div>`;
+}
+let filterJenis = 'semua';
+H.naskah = () => {
+  const list = D.naskah.filter(n=>filterJenis==='semua'||n.jenis===filterJenis);
+  return `
+  <div class="baris antara"><div><h1>Naskah</h1><p class="sub">Berita dan majalah dipisah; jenis dipilih saat naskah dibuat.</p></div>
+  ${punya('reporter','editor','pemred')?'<a class="btn utama" href="#naskah/baru">+ Tulis naskah</a>':''}</div>
+  <div class="tab">${['semua','berita','majalah'].map(j=>`<button class="${filterJenis===j?'aktif':''}" onclick="filterJenis='${j}';tampil()">${j[0].toUpperCase()+j.slice(1)}</button>`).join('')}</div>
+  <div class="kartu">${tabelNaskah(list)}</div>`;
+};
+
+H['naskah/baru'] = () => formNaskah({jenis:'berita',judul:'',rubrik:'',status:'draf',penulis:'Salman Hakim'}, true);
+function formNaskah(n, baru){
+  const rubrik = D.pilihan[n.jenis==='berita'?'rubrik_berita':'rubrik_majalah'].filter(r=>r.a);
+  const aksi = [];
+  if(n.status==='draf'||n.status==='revisi') aksi.push('<button class="btn" onclick="proto()">Simpan draf</button>','<button class="btn utama" onclick="proto()">Ajukan ke Editor</button>');
+  if(n.status==='diajukan' && punya('editor','pemred')) aksi.push('<button class="btn" onclick="proto()">Minta revisi</button>','<button class="btn bahaya" onclick="proto()">Tolak</button>','<button class="btn utama" onclick="proto()">Setujui (Lolos Editor)</button>');
+  if(n.status==='lolos' && punya('pemred')) aksi.push('<button class="btn" onclick="proto()">Minta revisi</button>','<button class="btn bahaya" onclick="proto()">Tolak</button>','<button class="btn utama" onclick="proto()">Terbitkan</button>');
+  return `
+  <p class="sub" style="margin:0"><a href="#naskah">← Naskah</a></p>
+  <div class="baris antara"><h1>${baru?'Tulis Naskah':esc(n.judul)}</h1>${baru?'':lencana(n.status)}</div>
+  <div class="dua" style="margin-top:12px">
+    <div class="kartu">
+      <label>Judul</label><input type="text" value="${esc(n.judul)}">
+      <div class="grid" style="margin:0">
+        <div><label>Jenis</label><select ${baru?'':'disabled'}><option ${n.jenis==='berita'?'selected':''}>Berita</option><option ${n.jenis==='majalah'?'selected':''}>Majalah</option></select></div>
+        <div><label>Rubrik</label><select>${rubrik.map(r=>`<option ${r.n===n.rubrik?'selected':''}>${r.n}</option>`).join('')}</select></div>
+        <div><label>Dari tugas (opsional)</label><select><option>— tanpa tugas —</option>${D.tugas.map(t=>`<option ${t.id===n.tugas?'selected':''}>${esc(t.judul)}</option>`).join('')}</select></div>
+      </div>
+      <label>Isi naskah</label><textarea>${baru?'':ISI_CONTOH}</textarea>
+      <label>Tautan foto (Google Drive, dll.)</label>
+      <div class="baris"><input type="url" placeholder="https://drive.google.com/..." style="flex:2"><input type="text" placeholder="Keterangan foto" style="flex:1"><button class="btn kecil" onclick="proto()">+ Tambah</button></div>
+      ${baru?'':'<p style="font-size:13px;margin:8px 0 0">📷 <a href="#" onclick="proto();return false">drive.google.com/…/final-futsal.jpg</a> — Kapten tim mengangkat piala</p>'}
+      <div class="baris" style="margin-top:16px">${aksi.join('')}</div>
+      ${aksi.length>2?'<label>Catatan untuk penulis</label><input type="text" placeholder="Wajib diisi saat minta revisi/menolak">':''}
+    </div>
+    <div class="kartu"><b>Riwayat</b>
+      ${baru?'<div class="kosong">Belum ada.</div>':`<ul class="riwayat" style="margin-top:10px">
+        <li>Diajukan<br><small>${esc(n.penulis)} · 05-11-2026 08.12</small></li>
+        <li>Minta revisi — “Lengkapi skor akhir dan nama pencetak gol.”<br><small>Rizki Maulana · 04-11-2026 20.30</small></li>
+        <li>Diajukan<br><small>${esc(n.penulis)} · 04-11-2026 16.05</small></li>
+        <li>Dibuat dari tugas<br><small>${esc(n.penulis)} · 03-11-2026 14.40</small></li></ul>`}
+    </div>
+  </div>`;
+}
+
+H.antrean = () => {
+  const sunting = D.naskah.filter(n=>n.status==='diajukan');
+  const setuju = D.naskah.filter(n=>n.status==='lolos');
+  return `<h1>Antrean Redaksi</h1><p class="sub">Naskah yang menunggu tindakan Anda.</p>
+  ${punya('editor','pemred')?`<div class="kartu"><b>Perlu disunting (Editor)</b>${tabelNaskah(sunting)}</div>`:''}
+  ${punya('pemred')?`<div class="kartu"><b>Menunggu persetujuan akhir (Pemred)</b>${tabelNaskah(setuju)}</div>`:''}`;
+};
+
+H.edisi = () => `
+  <div class="baris antara"><div><h1>Edisi Majalah</h1><p class="sub">Hanya Pemred yang menyusun edisi.</p></div>
+  ${punya('pemred')?'<button class="btn utama" onclick="proto()">+ Edisi baru</button>':''}</div>
+  <div class="kartu"><div class="tabel-wadah"><table><tr><th>Edisi</th><th>Tema</th><th>Terbit</th><th>Status</th><th></th></tr>
+  ${D.edisi.map(e=>`<tr><td><b>${e.nomor}</b></td><td>${esc(e.tema)}</td><td>${e.bulan}</td>
+    <td><span class="lencana ${e.status==='terbit'?'l-terbit':'l-diajukan'}">${e.status[0].toUpperCase()+e.status.slice(1)}</span></td>
+    <td><a class="btn kecil" href="#edisi/${e.id}">Buka</a></td></tr>`).join('')}
+  </table></div></div>`;
+
+function halEdisi(id){
+  const e = D.edisi.find(x=>x.id==id); if(!e) return '<div class="kosong">Edisi tidak ditemukan.</div>';
+  const isi = e.naskah.map(i=>D.naskah.find(n=>n.id===i));
+  const calon = D.naskah.filter(n=>n.jenis==='majalah'&&n.status==='terbit'&&!e.naskah.includes(n.id));
+  return `<p class="sub" style="margin:0"><a href="#edisi">← Edisi</a></p>
+  <div class="baris antara"><h1>${e.nomor} — ${esc(e.tema)}</h1>
+    <div class="baris">${punya('pemred')?'<button class="btn" onclick="proto()">Kunci edisi</button>':''}<a class="btn utama" href="#cetak/${e.id}">🖨 Halaman cetak</a></div></div>
+  <p class="sub">${e.bulan} · status ${e.status}</p>
+  <div class="kartu"><b>Isi edisi (urutan)</b>
+    ${isi.length?`<div class="tabel-wadah"><table>${isi.map((n,i)=>`<tr><td style="width:30px">${i+1}</td><td><b>${esc(n.judul)}</b><br><small style="color:var(--teks-2)">${esc(n.rubrik)} · ${esc(n.penulis)}</small></td>
+      <td style="text-align:right;white-space:nowrap">${punya('pemred')?'<button class="btn kecil" onclick="proto()">↑</button> <button class="btn kecil" onclick="proto()">↓</button> <button class="btn kecil bahaya" onclick="proto()">Keluarkan</button>':''}</td></tr>`).join('')}</table></div>`:'<div class="kosong">Belum ada naskah.</div>'}
+  </div>
+  ${punya('pemred')?`<div class="kartu"><b>Naskah majalah berstatus Terbit yang bisa dimasukkan</b>
+    ${calon.length?`<table>${calon.map(n=>`<tr><td>${esc(n.judul)}</td><td style="text-align:right"><button class="btn kecil" onclick="proto()">+ Masukkan</button></td></tr>`).join('')}</table>`:'<div class="kosong">Tidak ada.</div>'}</div>`:''}`;
+}
+
+function halCetak(id){
+  const e = D.edisi.find(x=>x.id==id); if(!e) return '';
+  const isi = e.naskah.map(i=>D.naskah.find(n=>n.id===i));
+  const perRubrik = {}; isi.forEach(n=>(perRubrik[n.rubrik]=perRubrik[n.rubrik]||[]).push(n));
+  return `<div class="baris antara cetak-alat" style="margin-bottom:14px"><a href="#edisi/${e.id}">← Kembali</a>
+    <button class="btn utama" onclick="window.print()">🖨 Cetak / Simpan PDF</button></div>
+  <div class="kertas">
+    <div class="sampul"><img src="${LOGO}" alt=""><h1 style="font-family:system-ui,sans-serif;margin:8px 0 0">Majalah Al-Ma'had</h1>
+      <div class="meta">${e.nomor} · ${e.bulan} · Tema: ${esc(e.tema)}</div></div>
+    ${Object.entries(perRubrik).map(([r,ns])=>`<h2>${esc(r)}</h2>${ns.map(n=>`<article><h3>${esc(n.judul)}</h3>
+      <div class="meta">Oleh ${esc(n.penulis)}</div>
+      <p>Lorem ipsum isi naskah contoh. Pada sistem asli, bagian ini berisi teks lengkap naskah yang sudah disetujui Pemred, lengkap dengan paragraf seperti dokumen Google Docs.</p>
+      <p class="meta">Foto: drive.google.com/…/contoh.jpg</p></article>`).join('')}`).join('')}
+  </div>`;
+}
+
+H.anggota = () => `
+  <div class="baris antara"><div><h1>Anggota</h1><p class="sub">Satu anggota boleh punya beberapa peran. Anggota periode lama diarsipkan.</p></div>
+  <button class="btn utama" onclick="proto()">+ Tambah anggota</button></div>
+  <div class="kartu"><div class="baris" style="margin-bottom:8px"><label style="margin:0">Periode</label><select style="width:auto"><option>2026/2027 (aktif)</option><option>2025/2026</option></select></div>
+  <div class="tabel-wadah"><table><tr><th>Nama</th><th>Email</th><th>Kelas</th><th>Peran</th><th>Status</th><th></th></tr>
+  ${D.anggota.map(a=>`<tr style="${a.status==='arsip'?'opacity:.6':''}"><td><b>${esc(a.nama)}</b></td><td>${esc(a.email)}</td><td>${a.kelas}</td>
+    <td>${a.peran.map(p=>`<span class="lencana l-peran">${p[0].toUpperCase()+p.slice(1)}</span>`).join(' ')}</td>
+    <td>${a.status==='arsip'?'<span class="lencana l-draf">Arsip</span>':'Aktif'}</td>
+    <td><button class="btn kecil" onclick="proto()">Ubah</button></td></tr>`).join('')}
+  </table></div></div>`;
+
+let kelompok = 'rubrik_berita';
+H.pilihan = () => `
+  <h1>Daftar Pilihan</h1><p class="sub">Dikelola Admin dan Pemred. Pilihan yang sudah dipakai hanya bisa dinonaktifkan, tidak dihapus.</p>
+  <div class="tab">${[['rubrik_berita','Rubrik berita'],['rubrik_majalah','Rubrik majalah']].map(([k,t])=>`<button class="${kelompok===k?'aktif':''}" onclick="kelompok='${k}';tampil()">${t}</button>`).join('')}</div>
+  <div class="kartu">
+    <div class="baris" style="margin-bottom:10px"><input type="text" placeholder="Nilai baru" style="flex:1"><button class="btn utama" onclick="proto()">+ Tambah</button></div>
+    <table>${D.pilihan[kelompok].map((r,i)=>`<tr style="${r.a?'':'opacity:.55'}"><td style="width:30px">${i+1}</td><td>${esc(r.n)}</td>
+      <td>${r.a?'Aktif':'<span class="lencana l-draf">Nonaktif</span>'}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn kecil" onclick="proto()">↑</button> <button class="btn kecil" onclick="proto()">↓</button>
+      <button class="btn kecil" onclick="D.pilihan[kelompok][${i}].a^=1;tampil()">${r.a?'Nonaktifkan':'Aktifkan'}</button></td></tr>`).join('')}</table>
+  </div>`;
+
+/* ================== MENU & RUTE ================== */
+const MENU = [
+  ['dasbor','Dasbor',()=>true],
+  ['tugas','Tugas Liputan',()=>punya('reporter','editor','pemred')],
+  ['naskah','Naskah',()=>punya('reporter','editor','pemred')],
+  ['antrean','Antrean Redaksi',()=>punya('editor','pemred')],
+  ['edisi','Edisi Majalah',()=>punya('pemred')],
+  ['__','Pengaturan',()=>punya('admin','pemred')],
+  ['anggota','Anggota',()=>punya('admin')],
+  ['pilihan','Daftar Pilihan',()=>punya('admin','pemred')],
+];
+function tampil(){
+  const r = (location.hash.slice(1) || 'masuk');
+  if(r==='masuk'){ $('#app').innerHTML = H.masuk(); return; }
+  let isi;
+  if(H[r]) isi = H[r]();
+  else if(r.startsWith('naskah/')) { const n=D.naskah.find(x=>x.id==r.split('/')[1]); isi = n?formNaskah(n,false):'<div class="kosong">Naskah tidak ditemukan.</div>'; }
+  else if(r.startsWith('edisi/')) isi = halEdisi(r.split('/')[1]);
+  else if(r.startsWith('cetak/')) isi = halCetak(r.split('/')[1]);
+  else isi = '<div class="kosong">Halaman tidak ditemukan.</div>';
+  const akar = r.split('/')[0].replace('-baru','');
+  $('#app').innerHTML = `
+  <header class="atas">
+    <button class="menu-btn" onclick="$('nav').classList.toggle('buka')" aria-label="Menu">☰</button>
+    <img class="logo" src="${LOGO}" alt=""><b>Al-Ma'had</b><span class="sela"></span>
+    <div class="peran-pilih" title="Pratinjau: pilih peran untuk melihat tampilan per peran">
+      <span style="color:var(--teks-2)">Lihat sebagai:</span>
+      ${['reporter','editor','pemred','admin'].map(p=>`<label><input type="checkbox" ${peran.has(p)?'checked':''} onchange="this.checked?peran.add('${p}'):peran.delete('${p}');tampil()">${p[0].toUpperCase()+p.slice(1)}</label>`).join('')}
+    </div>
+    <a class="btn kecil" href="#masuk">Keluar</a>
+  </header>
+  <div class="tata">
+    <nav>${MENU.filter(m=>m[2]()).map(([k,t])=>k==='__'?`<div class="judul">${t}</div>`:`<a href="#${k}" class="${akar===k||(akar==='cetak'&&k==='edisi')?'aktif':''}">${t}</a>`).join('')}</nav>
+    <main><div class="catatan-proto">Prototipe tampilan — data contoh, tombol belum berfungsi. Tema terang/gelap mengikuti perangkat.</div>${isi}</main>
+  </div>`;
+}
+addEventListener('hashchange', tampil);
+tampil();
+</script>
+</body>
+</html>

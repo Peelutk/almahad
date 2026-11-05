@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 6)
+# Al-Ma'had — Desain Sistem (Draf 7)
 
 > Status: **TAHAP DESAIN** — belum ada kode. Dokumen ini diubah sampai semua keputusan disetujui Hong Khai.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -14,7 +14,7 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 
 | No | Keputusan | Positif | Negatif |
 |----|-----------|---------|---------|
-| A-01 | Hosting Cloudflare (Workers + D1), **akun Cloudflare terpisah**; ID database D1: `0a95fda8-2dd8-4fd3-bff4-31bbea81ee5a` | Benar-benar lepas dari proyek lain; gratis | Perlu login wrangler terpisah di PC ini |
+| A-01 | Hosting Cloudflare (Workers + D1), **akun Cloudflare terpisah**; Worker `almahad` → https://almahad.jaohongk.workers.dev; ID database D1: `0a95fda8-2dd8-4fd3-bff4-31bbea81ee5a` | Benar-benar lepas dari proyek lain; gratis | Perlu login wrangler terpisah di PC ini |
 | A-02 | Kode disimpan di repo GitHub **publik** [Peelutk/almahad](https://github.com/Peelutk/almahad) (salinan kerja lokal `C:\HISADA\almahad`) | Ada cadangan & riwayat; bisa dihubungkan ke Workers Builds untuk deploy otomatis | Siapa pun bisa membaca desain & kode → rahasia (client secret, token) tidak boleh masuk repo |
 | A-03 | **Desain dulu**, kode belakangan | Struktur matang sebelum dibangun | Hasil yang bisa dicoba muncul lebih lambat |
 | A-04 | Pengguna: Reporter, Editor, Pemred, Admin | Tanpa pembaca umum → lebih sederhana & aman | Hasil kerja tidak terlihat publik dari sistem |
@@ -37,6 +37,7 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-21 | Daftar Pilihan untuk sementara hanya berisi **rubrik berita** dan **rubrik majalah**; kelompok lain ditambah nanti bila perlu | Mulai sederhana | Penambahan kelompok baru nanti butuh sedikit perubahan |
 | A-22 | Daftar Pilihan dikelola **Admin dan Pemred** | Pemred bisa langsung menambah rubrik sesuai kebutuhan redaksi | Dua pihak bisa mengubah; perubahan perlu dicatat |
 | A-23 | Tugas lewat tenggat **cukup ditandai "Terlambat"** dan tetap bisa dikerjakan | Tidak ada naskah yang hilang karena telat | Tenggat bisa kurang dihargai; Editor/Pemred memantau sendiri |
+| A-24 | Tampilan **sederhana**, warna dari logo (hijau tua `#00A859`, hijau muda `#88C44A`), tema **terang/gelap mengikuti perangkat** | Identitas konsisten; nyaman di HP & malam hari | Dua set warna harus dirawat; hijau logo terlalu terang untuk teks di latar putih → tombol memakai hijau lebih gelap `#007A41` |
 
 ## 3. Mindmap
 
@@ -145,8 +146,22 @@ flowchart TD
 | `edisi_naskah` | edisi_id, naskah_id, urutan |
 | `sesi` | token, anggota_id, kedaluwarsa |
 
-## 9. Pertanyaan terbuka
+## 9. Rancangan tampilan
 
-1. **Nama Worker** — usul `almahad` (akun Cloudflare diatur Hong Khai).
+Prototipe statis: `prototipe/index.html` (data contoh, tombol belum berfungsi; logo dari `aset/` yang tidak masuk repo).
 
-Selain itu desain dianggap **lengkap untuk draf ini**; langkah berikutnya (rancangan halaman/tampilan atau mulai kode) menunggu persetujuan Hong Khai.
+| Halaman | Pengguna | Isi |
+|---------|----------|-----|
+| Masuk | semua | Tombol Masuk dengan Google; hanya `@daarululuumlido.com` |
+| Dasbor | semua | Ringkasan sesuai peran: tugas saya, perlu disunting, menunggu Pemred, edisi disusun |
+| Tugas Liputan | Reporter, Editor, Pemred | Daftar tugas, tanda **Terlambat**; Editor/Pemred: Beri tugas (tenggat wajib) |
+| Naskah | Reporter, Editor, Pemred | Tab Semua/Berita/Majalah; tulis naskah; halaman naskah dengan tautan foto, tombol sesuai status & peran, riwayat |
+| Antrean Redaksi | Editor, Pemred | Perlu disunting; menunggu persetujuan akhir |
+| Edisi Majalah | Pemred | Daftar edisi; susun & urutkan naskah; kunci; halaman cetak |
+| Halaman cetak | Pemred | Tampilan seperti dokumen (kertas putih, per rubrik) → Cetak / Simpan PDF |
+| Anggota | Admin | Daftar per periode, peran ganda, status arsip |
+| Daftar Pilihan | Admin, Pemred | Tab rubrik berita/majalah; tambah, urutkan, nonaktifkan |
+
+## 10. Pertanyaan terbuka
+
+Tidak ada. Desain draf ini **lengkap**; langkah berikutnya (perubahan prototipe atau mulai kode) menunggu persetujuan Hong Khai.
