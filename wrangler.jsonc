@@ -1,0 +1,28 @@
+{
+  // Al-Ma'had — Cloudflare Worker + D1
+  // Deploy: Workers Builds (setiap push ke main). Rahasia TIDAK ditulis di sini.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "almahad",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "almahad",
+      "database_id": "0a95fda8-2dd8-4fd3-bff4-31bbea81ee5a"
+    }
+  ],
+  "vars": {
+    "GOOGLE_CLIENT_ID": "272243653251-t44feo34jks8603qa3sb0e9l9qthun3b.apps.googleusercontent.com",
+    "GOOGLE_HD": "daarululuumlido.com",
+    "ADMIN_AWAL": "216326@daarululuumlido.com"
+  },
+  // Variabel/rahasia yang diatur di dashboard (GOOGLE_CLIENT_SECRET) tidak dihapus saat deploy.
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}

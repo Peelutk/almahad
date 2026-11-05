@@ -1,6 +1,6 @@
-# Al-Ma'had — Desain Sistem (Draf 7)
+# Al-Ma'had — Desain Sistem (Draf 8)
 
-> Status: **TAHAP DESAIN** — belum ada kode. Dokumen ini diubah sampai semua keputusan disetujui Hong Khai.
+> Status: **TAHAP KODE — Tahap 1** (login, anggota, periode, daftar pilihan). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
 
 ## 1. Gambaran
@@ -38,6 +38,12 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-22 | Daftar Pilihan dikelola **Admin dan Pemred** | Pemred bisa langsung menambah rubrik sesuai kebutuhan redaksi | Dua pihak bisa mengubah; perubahan perlu dicatat |
 | A-23 | Tugas lewat tenggat **cukup ditandai "Terlambat"** dan tetap bisa dikerjakan | Tidak ada naskah yang hilang karena telat | Tenggat bisa kurang dihargai; Editor/Pemred memantau sendiri |
 | A-24 | Tampilan **sederhana**, warna dari logo (hijau tua `#00A859`, hijau muda `#88C44A`), tema **terang/gelap mengikuti perangkat** | Identitas konsisten; nyaman di HP & malam hari | Dua set warna harus dirawat; hijau logo terlalu terang untuk teks di latar putih → tombol memakai hijau lebih gelap `#007A41` |
+| A-25 | Kode dibangun **bertahap**; Tahap 1 = login Google, Anggota & peran, Periode, Daftar Pilihan | Fondasi teruji sebelum alur redaksi | Fitur redaksi belum bisa dipakai di Tahap 1 |
+| A-26 | Deploy lewat **Workers Builds** dari GitHub (push ke `main` = deploy) | Tanpa login wrangler di PC; deploy otomatis | Setiap push langsung tayang → push hanya setelah uji lulus |
+| A-27 | **Admin awal** = `216326@daarululuumlido.com`, otomatis Admin + Pemred saat pertama masuk (hanya selama belum ada Admin) | Tidak perlu halaman penyiapan | Email admin awal tertulis di konfigurasi publik |
+| A-28 | Ganti periode: Admin mencentang anggota yang **lanjut**; sisanya diarsipkan otomatis, Admin yang mengganti selalu ikut lanjut | Sesuai A-14, tidak ada yang terkunci tanpa sengaja | Anggota yang lupa dicentang harus diaktifkan kembali manual |
+| A-29 | Harus selalu ada **minimal satu Admin aktif** (sistem menolak perubahan yang melanggar) | Sistem tidak pernah kehilangan pengelola | — |
+| A-30 | Logo asli **tidak** masuk repo; aplikasi memakai tanda lingkaran dua warna hijau | Berkas logo tetap privat | Tampilan belum memakai logo asli |
 
 ## 3. Mindmap
 
@@ -148,7 +154,7 @@ flowchart TD
 
 ## 9. Rancangan tampilan
 
-Prototipe statis: `prototipe/index.html` (data contoh, tombol belum berfungsi; logo dari `aset/` yang tidak masuk repo).
+Prototipe statis: `prototipe/index.html` (data contoh, tombol belum berfungsi; logo dari `aset/` yang tidak masuk repo). Aplikasi asli Tahap 1 ada di `public/`.
 
 | Halaman | Pengguna | Isi |
 |---------|----------|-----|
