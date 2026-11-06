@@ -126,3 +126,5 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .muat{color:var(--teks-2);padding:24px;text-align:center}
 .siapa{font-size:13px;color:var(--teks-2);text-align:right;line-height:1.2}
 @media (max-width:760px){.siapa{display:none}}
+.isi-baca{line-height:1.7;margin-bottom:12px}
+.isi-baca p{margin:0 0 12px}

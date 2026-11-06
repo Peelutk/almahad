@@ -1,63 +1,16 @@
-// Al-Ma'had — Worker utama (Tahap 1)
+// Al-Ma'had — Worker utama
 // API di /api/*, selain itu file statis dari ./public.
 import { pastikanSkema } from './skema.js';
+import {
+  Galat, json, alihkan, bacaCookie, buatCookie, acak, sha256, dekodeJwt, bacaJson, teks, daftarPeran, wajib,
+} from './umum.js';
+import { apiRedaksi } from './redaksi.js';
 
-const PERAN = ['reporter', 'editor', 'pemred', 'admin'];
 const KELOMPOK = { rubrik_berita: 'Rubrik berita', rubrik_majalah: 'Rubrik majalah' };
 const UMUR_SESI = 30 * 24 * 3600; // detik
 const COOKIE_SESI = 'am_sesi';
 const COOKIE_STATE = 'am_state';
 
-class Galat extends Error {
-  constructor(status, pesan) { super(pesan); this.status = status; }
-}
-
-// ---------- pembantu ----------
-const json = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), {
-  status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers },
-});
-const alihkan = (lokasi, headers = {}) => new Response(null, { status: 302, headers: { location: lokasi, 'cache-control': 'no-store', ...headers } });
-
-function bacaCookie(req, nama) {
-  const c = req.headers.get('cookie') || '';
-  for (const bagian of c.split(';')) {
-    const [k, ...v] = bagian.trim().split('=');
-    if (k === nama) return v.join('=');
-  }
-  return null;
-}
-const buatCookie = (nama, nilai, umur, path = '/') =>
-  `${nama}=${nilai}; Path=${path}; Max-Age=${umur}; HttpOnly; Secure; SameSite=Lax`;
-
-function acak(n = 32) {
-  const b = crypto.getRandomValues(new Uint8Array(n));
-  return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-async function sha256(teks) {
-  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(teks));
-  return [...new Uint8Array(h)].map(x => x.toString(16).padStart(2, '0')).join('');
-}
-function dekodeJwt(token) {
-  const p = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-  const biner = atob(p + '='.repeat((4 - p.length % 4) % 4));
-  return JSON.parse(new TextDecoder().decode(Uint8Array.from(biner, c => c.charCodeAt(0))));
-}
-async function bacaJson(req) {
-  try { return await req.json(); } catch { throw new Galat(400, 'Data tidak valid.'); }
-}
-function teks(v, nama, maks, wajib = true) {
-  const s = typeof v === 'string' ? v.trim() : '';
-  if (wajib && !s) throw new Galat(400, `${nama} wajib diisi.`);
-  if (s.length > maks) throw new Galat(400, `${nama} maksimal ${maks} karakter.`);
-  return s;
-}
-function daftarPeran(v) {
-  if (!Array.isArray(v)) throw new Galat(400, 'Peran tidak valid.');
-  const p = [...new Set(v)];
-  if (!p.length) throw new Galat(400, 'Pilih minimal satu peran.');
-  if (p.some(x => !PERAN.includes(x))) throw new Galat(400, 'Peran tidak dikenal.');
-  return p;
-}
 const domain = env => (env.GOOGLE_HD || '').toLowerCase();
 function emailSekolah(env, email) {
   const e = teks(email, 'Email', 200).toLowerCase();
@@ -78,10 +31,6 @@ async function ambilSaya(req, env) {
   const { results } = await env.DB.prepare('SELECT peran FROM anggota_peran WHERE anggota_id = ?').bind(a.id).all();
   a.peran = results.map(r => r.peran);
   return a;
-}
-function wajib(saya, ...peran) {
-  if (!saya) throw new Galat(401, 'Silakan masuk terlebih dahulu.');
-  if (peran.length && !peran.some(p => saya.peran.includes(p))) throw new Galat(403, 'Anda tidak punya akses untuk ini.');
 }
 
 // Dipanggil setelah identitas Google terverifikasi.
@@ -371,6 +320,10 @@ async function api(req, env, url) {
   if (p === '/api/pilihan/urutan' && m === 'POST') { wajib(saya, 'admin', 'pemred'); return urutkanPilihan(req, env); }
   r = p.match(/^\/api\/pilihan\/(\d+)$/);
   if (r && m === 'PUT') { wajib(saya, 'admin', 'pemred'); return ubahPilihan(req, env, Number(r[1])); }
+
+  // Modul redaksi: tugas, naskah, antrean, edisi.
+  const hasil = await apiRedaksi(req, env, saya, p, m);
+  if (hasil) return hasil;
 
   throw new Galat(404, 'Tidak ditemukan.');
 }

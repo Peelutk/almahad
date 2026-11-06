@@ -8,17 +8,19 @@ Sistem redaksi internal organisasi jurnalistik santri — Cloudflare Workers + D
 
 ## Status
 
-**Tahap 1** — login Google, Anggota & peran, Periode kepengurusan, Daftar Pilihan.
-Tugas liputan, naskah, antrean redaksi, dan edisi majalah menyusul.
+Semua modul tersedia: login Google, Anggota & peran, Periode, Daftar Pilihan, Tugas Liputan,
+Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah).
 
 ## Struktur
 
 | Berkas | Isi |
 |--------|-----|
 | `wrangler.jsonc` | Konfigurasi Worker `almahad`, binding D1 `DB`, variabel publik |
-| `src/worker.js` | API `/api/*` (login Google, sesi, anggota, periode, daftar pilihan) |
+| `src/worker.js` | API `/api/*`: login Google, sesi, anggota, periode, daftar pilihan |
+| `src/redaksi.js` | API tugas, naskah, antrean, edisi, ringkasan dasbor |
+| `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
 | `src/skema.js` | Migrasi database — berjalan otomatis pada permintaan pertama |
-| `public/` | Tampilan aplikasi (HTML/CSS/JS tanpa build) |
+| `public/` | Tampilan aplikasi (HTML/CSS/JS tanpa build); `redaksi.js` = halaman modul redaksi |
 
 ## Penyiapan (sekali)
 

@@ -1,4 +1,4 @@
-// Al-Ma'had — tampilan aplikasi (Tahap 1)
+// Al-Ma'had — tampilan aplikasi (kerangka, masuk, pengaturan)
 'use strict';
 
 const $ = s => document.querySelector(s);
@@ -43,17 +43,6 @@ function halMasuk() {
     <a class="btn utama g-btn" href="/api/google/mulai">Masuk dengan Google</a>
     <p class="sub" style="margin-top:12px;font-size:13px">Hanya email sekolah yang terdaftar sebagai anggota.</p>
   </div></div>`;
-}
-
-// ---------- dasbor ----------
-async function halDasbor() {
-  return `<h1>Assalamu'alaikum, ${esc(saya.nama)}</h1>
-  <p class="sub">Periode aktif: <b>${esc(saya.periode_aktif?.nama || '—')}</b></p>
-  <div class="grid">
-    <div class="kartu"><b>Peran Anda</b><div style="margin-top:8px">${saya.peran.map(p => `<span class="lencana l-peran">${besar(p)}</span>`).join(' ')}</div></div>
-  </div>
-  <div class="kartu"><b>Tahap 1</b><p class="sub" style="margin:6px 0 0">Fitur yang sudah tersedia: Anggota, Periode, dan Daftar Pilihan.
-  Tugas liputan, naskah, antrean redaksi, dan edisi majalah menyusul pada tahap berikutnya.</p></div>`;
 }
 
 // ---------- anggota ----------
@@ -193,13 +182,21 @@ function geserPilihan(i, arah) {
 }
 
 // ---------- kerangka & rute ----------
+// [kunci, judul, boleh?, halaman, tampil di menu?]
 const MENU = [
   ['dasbor', 'Dasbor', () => true, halDasbor],
+  ['tugas', 'Tugas Liputan', () => punya('reporter', 'editor', 'pemred'), halTugas],
+  ['naskah', 'Naskah', () => punya('reporter', 'editor', 'pemred'), a => a.length ? halNaskahDetail(a) : halNaskah()],
+  ['antrean', 'Antrean Redaksi', () => punya('editor', 'pemred'), halAntrean],
+  ['edisi', 'Edisi Majalah', () => punya('pemred'), halEdisi],
+  ['cetak', 'Cetak edisi', () => punya('pemred'), halCetak, false],
+  ['cetak-naskah', 'Cetak naskah', () => punya('reporter', 'editor', 'pemred'), halCetakNaskah, false],
   ['__', 'Pengaturan', () => punya('admin', 'pemred')],
   ['anggota', 'Anggota', () => punya('admin'), halAnggota],
   ['periode', 'Periode', () => punya('admin'), halPeriode],
   ['pilihan', 'Daftar Pilihan', () => punya('admin', 'pemred'), halPilihan],
 ];
+let setelahTampil = null; // dipanggil setelah halaman dimasukkan ke DOM
 
 async function keluar() {
   try { await api('/api/keluar', 'POST'); } catch {}
@@ -213,8 +210,9 @@ async function tampil() {
   if (!saya) { $('#app').innerHTML = halMasuk(); return; }
   if (location.search) history.replaceState(null, '', '/' + location.hash);
 
-  const rute = location.hash.slice(1) || 'dasbor';
+  const [rute, ...args] = (location.hash.slice(1) || 'dasbor').split('/');
   const item = MENU.find(m => m[0] === rute && m[3] && m[2]()) || MENU[0];
+  const menuAktif = { cetak: 'edisi', 'cetak-naskah': 'naskah' }[item[0]] || item[0];
   $('#app').innerHTML = `
   <header class="atas">
     <button class="menu-btn" onclick="$('nav').classList.toggle('buka')" aria-label="Menu">☰</button>
@@ -223,11 +221,15 @@ async function tampil() {
     <button class="btn kecil" onclick="keluar()">Keluar</button>
   </header>
   <div class="tata">
-    <nav>${MENU.filter(m => m[2]()).map(([k, t]) => k === '__' ? `<div class="judul">${t}</div>` : `<a href="#${k}" class="${item[0] === k ? 'aktif' : ''}">${t}</a>`).join('')}</nav>
+    <nav>${MENU.filter(m => m[2]() && m[4] !== false).map(([k, t]) => k === '__' ? `<div class="judul">${t}</div>` : `<a href="#${k}" class="${menuAktif === k ? 'aktif' : ''}">${t}</a>`).join('')}</nav>
     <main id="isi"><div class="muat">Memuat…</div></main>
   </div>`;
-  try { $('#isi').innerHTML = await item[3](); }
-  catch (e) { $('#isi').innerHTML = `<div class="galat">${esc(e.message)}</div>`; }
+  setelahTampil = null;
+  try {
+    $('#isi').innerHTML = await item[3](item[0] === rute ? args : []);
+    if (setelahTampil) setelahTampil();
+  } catch (e) { $('#isi').innerHTML = `<div class="galat">${esc(e.message)}</div>`; }
+  window.scrollTo(0, 0);
 }
 
 addEventListener('hashchange', tampil);

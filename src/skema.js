@@ -48,6 +48,72 @@ export const MIGRASI = [
       `INSERT OR IGNORE INTO periode (nama, aktif) VALUES ('2026/2027', 1)`,
     ],
   },
+  {
+    versi: 2,
+    nama: 'Tahap 2: tugas liputan, naskah, foto, riwayat, edisi majalah',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS tugas (
+        id INTEGER PRIMARY KEY,
+        judul TEXT NOT NULL,
+        keterangan TEXT NOT NULL DEFAULT '',
+        jenis TEXT NOT NULL CHECK (jenis IN ('berita','majalah')),
+        rubrik_id INTEGER NOT NULL REFERENCES pilihan(id),
+        pemberi_id INTEGER NOT NULL REFERENCES anggota(id),
+        reporter_id INTEGER NOT NULL REFERENCES anggota(id),
+        tenggat TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'baru' CHECK (status IN ('baru','dikerjakan','selesai','batal')),
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS tugas_reporter ON tugas(reporter_id)`,
+      `CREATE TABLE IF NOT EXISTS naskah (
+        id INTEGER PRIMARY KEY,
+        jenis TEXT NOT NULL CHECK (jenis IN ('berita','majalah')),
+        judul TEXT NOT NULL,
+        rubrik_id INTEGER NOT NULL REFERENCES pilihan(id),
+        penulis_id INTEGER NOT NULL REFERENCES anggota(id),
+        tugas_id INTEGER REFERENCES tugas(id),
+        isi TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'draf' CHECK (status IN ('draf','diajukan','revisi','lolos','terbit','ditolak')),
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now')),
+        diubah_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS naskah_penulis ON naskah(penulis_id)`,
+      `CREATE INDEX IF NOT EXISTS naskah_status ON naskah(status)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS naskah_tugas ON naskah(tugas_id) WHERE tugas_id IS NOT NULL`,
+      `CREATE TABLE IF NOT EXISTS naskah_foto (
+        id INTEGER PRIMARY KEY,
+        naskah_id INTEGER NOT NULL REFERENCES naskah(id) ON DELETE CASCADE,
+        tautan TEXT NOT NULL,
+        keterangan TEXT NOT NULL DEFAULT '',
+        urutan INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE INDEX IF NOT EXISTS naskah_foto_naskah ON naskah_foto(naskah_id)`,
+      `CREATE TABLE IF NOT EXISTS naskah_riwayat (
+        id INTEGER PRIMARY KEY,
+        naskah_id INTEGER NOT NULL REFERENCES naskah(id) ON DELETE CASCADE,
+        dari_status TEXT,
+        ke_status TEXT NOT NULL,
+        oleh_id INTEGER NOT NULL REFERENCES anggota(id),
+        catatan TEXT NOT NULL DEFAULT '',
+        waktu TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS naskah_riwayat_naskah ON naskah_riwayat(naskah_id)`,
+      `CREATE TABLE IF NOT EXISTS edisi (
+        id INTEGER PRIMARY KEY,
+        nomor TEXT NOT NULL UNIQUE,
+        tema TEXT NOT NULL DEFAULT '',
+        bulan_terbit TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'disusun' CHECK (status IN ('disusun','dikunci','terbit')),
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS edisi_naskah (
+        edisi_id INTEGER NOT NULL REFERENCES edisi(id) ON DELETE CASCADE,
+        naskah_id INTEGER NOT NULL UNIQUE REFERENCES naskah(id),
+        urutan INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (edisi_id, naskah_id)
+      )`,
+    ],
+  },
 ];
 
 let siap = false;

@@ -1,6 +1,6 @@
-# Al-Ma'had — Desain Sistem (Draf 8)
+# Al-Ma'had — Desain Sistem (Draf 9)
 
-> Status: **TAHAP KODE — Tahap 1** (login, anggota, periode, daftar pilihan). Keputusan baru tetap dicatat di sini.
+> Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
 
 ## 1. Gambaran
@@ -44,6 +44,13 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-28 | Ganti periode: Admin mencentang anggota yang **lanjut**; sisanya diarsipkan otomatis, Admin yang mengganti selalu ikut lanjut | Sesuai A-14, tidak ada yang terkunci tanpa sengaja | Anggota yang lupa dicentang harus diaktifkan kembali manual |
 | A-29 | Harus selalu ada **minimal satu Admin aktif** (sistem menolak perubahan yang melanggar) | Sistem tidak pernah kehilangan pengelola | — |
 | A-30 | Logo asli **tidak** masuk repo; aplikasi memakai tanda lingkaran dua warna hijau | Berkas logo tetap privat | Tampilan belum memakai logo asli |
+| A-31 | **Siapa melihat naskah**: penulis selalu; Editor/Pemred semua naskah kecuali Draf orang lain; naskah **Terbit** bisa dibaca semua anggota | Draf tetap pribadi; hasil terbit jadi arsip bersama | Reporter tidak bisa melihat naskah orang lain yang sedang diproses |
+| A-32 | **Siapa mengubah isi**: penulis saat Draf/Revisi; Editor/Pemred saat Diajukan (penyuntingan dicatat "Disunting"); Pemred saat Lolos Editor; Terbit & Ditolak terkunci | Sesuai alur sunting berjenjang; jejak penyuntingan jelas | Penulis tidak bisa mengoreksi sendiri setelah mengajukan — harus lewat Revisi |
+| A-33 | Naskah **Ditolak** bersifat final; penulis membuat naskah baru bila ingin mencoba lagi | Alur sederhana, riwayat jujur | Tulisan harus disalin ke naskah baru |
+| A-34 | Penulis boleh **menghapus naskah Draf** miliknya; tugasnya kembali berstatus Baru | Tidak menumpuk draf percobaan | Draf yang terhapus tidak bisa dikembalikan |
+| A-35 | Satu tugas hanya punya **satu naskah**; tugas jadi **Dikerjakan** saat naskah dibuat dan **Selesai** saat naskah diajukan; tugas yang sudah punya naskah tidak bisa dibatalkan atau dipindah reporternya | Status tugas otomatis, tidak perlu diubah manual | — |
+| A-36 | Status edisi: **Disusun ⇄ Dikunci → Terbit**; isi & urutan hanya bisa diubah saat Disusun; edisi Terbit tidak bisa diubah; satu naskah hanya masuk satu edisi | Isi edisi aman saat dikerjakan desainer | Koreksi setelah terbit tidak mungkin |
+| A-37 | Ada **halaman cetak per naskah** (selain per edisi) untuk berita/mading | Berita bisa dicetak tanpa membuat edisi | — |
 
 ## 3. Mindmap
 
