@@ -19,6 +19,60 @@ const waktu = s => {
 };
 const jenisNama = j => j === 'berita' ? 'Berita' : 'Majalah';
 const tautanAman = u => /^https?:\/\//i.test(u) ? u : '#';
+
+// ---------- Foto: tautan Google Drive / gambar langsung → tampilan gambar ----------
+// File Drive  → thumbnail Drive (dimuat dengan login Google si pembaca).
+// Folder Drive → bingkai grid bawaan Drive (embeddedfolderview).
+// Tautan langsung berakhiran .jpg/.png/... → <img>.
+const ID_DRIVE = /^[A-Za-z0-9_-]{10,}$/;
+function infoFoto(tautan) {
+  let u; try { u = new URL(tautan); } catch { return { jenis: 'lain' }; }
+  if (!/^https?:$/.test(u.protocol)) return { jenis: 'lain' };
+  const host = u.hostname.toLowerCase();
+  if (host === 'drive.google.com' || host === 'docs.google.com') {
+    let m = u.pathname.match(/\/folders\/([^/?#]+)/);
+    let id = m ? m[1] : (u.pathname.startsWith('/folderview') || u.pathname.startsWith('/embeddedfolderview') ? u.searchParams.get('id') : null);
+    if (id && ID_DRIVE.test(id)) return { jenis: 'folder', id };
+    m = u.pathname.match(/\/(?:file\/d|d)\/([^/?#]+)/);
+    id = m ? m[1] : (['/open', '/uc', '/thumbnail'].includes(u.pathname) ? u.searchParams.get('id') : null);
+    if (id && ID_DRIVE.test(id)) return { jenis: 'file', id };
+    return { jenis: 'lain' };
+  }
+  if (host === 'lh3.googleusercontent.com') {
+    const m = u.pathname.match(/^\/d\/([^/?#=]+)/);
+    if (m && ID_DRIVE.test(m[1])) return { jenis: 'file', id: m[1] };
+  }
+  if (/\.(jpe?g|png|gif|webp|avif)$/i.test(u.pathname)) return { jenis: 'gambar', src: u.href };
+  return { jenis: 'lain' };
+}
+// Gambar yang gagal dimuat (izin berbagi, bukan gambar, dll.) diganti pesan.
+function fotoGagal(img) {
+  const p = document.createElement('div');
+  p.className = 'foto-gagal';
+  p.textContent = 'Gambar tidak bisa dimuat — periksa izin berbagi atau buka tautannya.';
+  img.replaceWith(p);
+}
+// mode: 'baca' (halaman naskah), 'kecil' (pratinjau di form), 'cetak'
+function tampilFoto(f, mode = 'baca') {
+  const info = infoFoto(f.tautan);
+  const tautan = esc(tautanAman(f.tautan));
+  const ket = f.keterangan ? `<figcaption>${esc(f.keterangan)}</figcaption>` : '';
+  const lebar = mode === 'cetak' ? 1600 : mode === 'kecil' ? 400 : 1200;
+  const muat = mode === 'cetak' ? 'eager' : 'lazy';
+  if (info.jenis === 'file' || info.jenis === 'gambar') {
+    const src = info.jenis === 'file' ? `https://drive.google.com/thumbnail?id=${info.id}&sz=w${lebar}` : info.src;
+    return `<figure class="foto foto-${mode}"><a href="${tautan}" target="_blank" rel="noopener noreferrer">
+      <img src="${esc(src)}" alt="${esc(f.keterangan || 'Foto')}" loading="${muat}" referrerpolicy="no-referrer" onerror="fotoGagal(this)"></a>${ket}</figure>`;
+  }
+  if (info.jenis === 'folder') {
+    const buka = `<a href="${tautan}" target="_blank" rel="noopener noreferrer">Buka folder di Drive ↗</a>`;
+    if (mode === 'cetak') return `<p class="meta">Folder foto: ${esc(f.tautan)}${f.keterangan ? ' (' + esc(f.keterangan) + ')' : ''}</p>`;
+    return `<figure class="foto foto-folder"><iframe src="https://drive.google.com/embeddedfolderview?id=${info.id}#grid" title="${esc(f.keterangan || 'Folder foto')}"
+      loading="lazy" referrerpolicy="no-referrer"></iframe><figcaption>${f.keterangan ? esc(f.keterangan) + ' · ' : ''}${buka}</figcaption></figure>`;
+  }
+  if (mode === 'cetak') return `<p class="meta">Foto: ${esc(f.tautan)}${f.keterangan ? ' (' + esc(f.keterangan) + ')' : ''}</p>`;
+  return `<p style="font-size:14px">📷 <a href="${tautan}" target="_blank" rel="noopener noreferrer" style="word-break:break-all">${esc(f.tautan)}</a>${f.keterangan ? ' — ' + esc(f.keterangan) : ''}</p>`;
+}
 // Teks naskah → paragraf HTML (aman)
 const paragraf = t => (t || '').split(/\n\s*\n/).filter(x => x.trim()).map(p => `<p>${esc(p.trim()).replace(/\n/g, '<br>')}</p>`).join('');
 
@@ -162,7 +216,7 @@ async function halNaskahDetail(args) {
         <div id="daftar-foto"></div>
         <div class="baris"><input type="url" id="foto-tautan" placeholder="https://drive.google.com/..." style="flex:2;min-width:180px"><input type="text" id="foto-ket" placeholder="Keterangan foto" maxlength="200" style="flex:1;min-width:120px"><button class="btn kecil" type="button" onclick="tambahFoto()">+ Tambah</button></div>
       </form>` : `<div class="isi-baca">${paragraf(n.isi) || '<p class="sub">(isi kosong)</p>'}</div>
-        ${n.foto.length ? `<b>Foto</b><ul>${n.foto.map(f => `<li><a href="${esc(tautanAman(f.tautan))}" target="_blank" rel="noopener noreferrer">${esc(f.tautan)}</a>${f.keterangan ? ' — ' + esc(f.keterangan) : ''}</li>`).join('')}</ul>` : ''}`}
+        ${n.foto.length ? `<b>Foto</b><div class="galeri">${n.foto.map(f => tampilFoto(f)).join('')}</div>` : ''}`}
       ${n.aksi.some(a => ['revisi', 'tolak'].includes(a)) ? '<label>Catatan untuk penulis (wajib saat minta revisi / menolak)</label><input type="text" id="catatan" maxlength="1000">' : ''}
       <div class="galat" id="f-galat" hidden></div>
       <div class="baris" style="margin-top:16px">
@@ -179,8 +233,8 @@ async function halNaskahDetail(args) {
 }
 function gambarFoto() {
   const el = $('#daftar-foto'); if (!el) return;
-  el.innerHTML = fotoKini.map((f, i) => `<div class="baris" style="margin-bottom:6px;font-size:14px">📷 <a href="${esc(tautanAman(f.tautan))}" target="_blank" rel="noopener noreferrer" style="word-break:break-all">${esc(f.tautan)}</a>
-    ${f.keterangan ? '— ' + esc(f.keterangan) : ''} <button class="btn kecil" type="button" onclick="fotoKini.splice(${i},1);gambarFoto()">Hapus</button></div>`).join('');
+  el.innerHTML = fotoKini.length ? `<div class="galeri">${fotoKini.map((f, i) => `<div class="foto-item">${tampilFoto(f, 'kecil')}
+    <button class="btn kecil" type="button" onclick="fotoKini.splice(${i},1);gambarFoto()">Hapus</button></div>`).join('')}</div>` : '';
 }
 function pasangFormNaskah() {
   gambarFoto();
@@ -314,7 +368,7 @@ function geserEdisi(i, arah) {
 
 // ======================= CETAK =======================
 const artikelCetak = n => `<article><h3>${esc(n.judul)}</h3><div class="meta">Oleh ${esc(n.penulis)}</div>
-  ${paragraf(n.isi)}${n.foto?.length ? `<p class="meta">Foto: ${n.foto.map(f => esc(f.tautan) + (f.keterangan ? ' (' + esc(f.keterangan) + ')' : '')).join('; ')}</p>` : ''}</article>`;
+  ${paragraf(n.isi)}${(n.foto || []).map(f => tampilFoto(f, 'cetak')).join('')}</article>`;
 async function halCetak(args) {
   const e = await api(`/api/edisi/${Number(args[0])}`);
   const perRubrik = [];

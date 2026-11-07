@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 9)
+# Al-Ma'had — Desain Sistem (Draf 10)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -51,6 +51,8 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-35 | Satu tugas hanya punya **satu naskah**; tugas jadi **Dikerjakan** saat naskah dibuat dan **Selesai** saat naskah diajukan; tugas yang sudah punya naskah tidak bisa dibatalkan atau dipindah reporternya | Status tugas otomatis, tidak perlu diubah manual | — |
 | A-36 | Status edisi: **Disusun ⇄ Dikunci → Terbit**; isi & urutan hanya bisa diubah saat Disusun; edisi Terbit tidak bisa diubah; satu naskah hanya masuk satu edisi | Isi edisi aman saat dikerjakan desainer | Koreksi setelah terbit tidak mungkin |
 | A-37 | Ada **halaman cetak per naskah** (selain per edisi) untuk berita/mading | Berita bisa dicetak tanpa membuat edisi | — |
+| A-38 | **Foto ditampilkan dari tautan**: tautan *file* Google Drive → gambar (thumbnail Drive, dimuat dengan login Google si pembaca); tautan *folder* Drive → bingkai grid bawaan Drive; tautan langsung berakhiran .jpg/.png/.webp/.gif → gambar; tautan lain tetap teks | Tanpa API key dan tanpa server tambahan; folder khusus akun sekolah tetap terlihat oleh pembaca yang berhak | Gambar hanya tampil bila pembaca punya akses ke file; bingkai folder bisa kosong bila browser memblokir cookie pihak ketiga dan tampilannya gaya Google |
+| A-39 | **Halaman cetak memuat gambar** dari tautan file/gambar; folder tetap dicetak sebagai tautan | Hasil cetak/PDF berisi foto | Folder tidak ikut tercetak; gambar yang gagal dimuat tercetak sebagai pesan |
 
 ## 3. Mindmap
 
