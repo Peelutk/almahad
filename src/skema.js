@@ -114,6 +114,32 @@ export const MIGRASI = [
       )`,
     ],
   },
+  {
+    versi: 3,
+    nama: 'Notifikasi email: pengaturan, antrean email, penanda pengingat tenggat',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS pengaturan (
+        kunci TEXT PRIMARY KEY,
+        nilai TEXT NOT NULL,
+        diubah_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS email_antrean (
+        id INTEGER PRIMARY KEY,
+        ke TEXT NOT NULL,
+        subjek TEXT NOT NULL,
+        html TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'menunggu' CHECK (status IN ('menunggu','dikirim','terkirim','gagal')),
+        percobaan INTEGER NOT NULL DEFAULT 0,
+        galat TEXT,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now')),
+        dikunci_at TEXT,
+        dikirim_at TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS email_antrean_status ON email_antrean(status)`,
+      `ALTER TABLE tugas ADD COLUMN ingat_h1_at TEXT`,
+      `ALTER TABLE tugas ADD COLUMN ingat_telat_at TEXT`,
+    ],
+  },
 ];
 
 let siap = false;

@@ -1,6 +1,10 @@
 // Modul redaksi: tugas liputan, naskah, antrean, edisi majalah.
 // Aturan mengacu ke DESAIN.md (A-05, A-09..A-17, A-23).
 import { Galat, json, bacaJson, teks, wajib } from './umum.js';
+import { notifTugas, notifNaskah } from './email.js';
+
+// Notifikasi tidak boleh menggagalkan aksi utama.
+const amanNotif = async f => { try { await f(); } catch (e) { console.error('notif', e); } };
 
 const JENIS = ['berita', 'majalah'];
 const KELOMPOK_JENIS = { berita: 'rubrik_berita', majalah: 'rubrik_majalah' };
@@ -76,6 +80,7 @@ async function tambahTugas(req, env, saya) {
   if (tenggat < hariIni()) throw new Galat(400, 'Tenggat tidak boleh di masa lalu.');
   const r = await env.DB.prepare(`INSERT INTO tugas (judul, keterangan, jenis, rubrik_id, pemberi_id, reporter_id, tenggat)
     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`).bind(judul, keterangan, jenis, rubrik, saya.id, reporter, tenggat).first();
+  await amanNotif(() => notifTugas(env, r.id));
   return json({ id: r.id }, 201);
 }
 
@@ -106,8 +111,12 @@ async function ubahTugas(req, env, id) {
     jenis = cekJenis(b.jenis);
   }
   if (b.rubrik_id !== undefined || jenis !== t.jenis) rubrik = await cekRubrik(env, b.rubrik_id ?? t.rubrik_id, jenis, t.rubrik_id);
-  await env.DB.prepare('UPDATE tugas SET judul = ?, keterangan = ?, jenis = ?, rubrik_id = ?, reporter_id = ?, tenggat = ? WHERE id = ?')
-    .bind(judul, keterangan, jenis, rubrik, reporter, tenggat, id).run();
+  // Tenggat berubah → pengingat boleh dikirim lagi untuk tenggat baru.
+  const tenggatBaru = tenggat !== t.tenggat ? 1 : 0;
+  await env.DB.prepare(`UPDATE tugas SET judul = ?, keterangan = ?, jenis = ?, rubrik_id = ?, reporter_id = ?, tenggat = ?,
+      ingat_h1_at = CASE WHEN ? THEN NULL ELSE ingat_h1_at END, ingat_telat_at = CASE WHEN ? THEN NULL ELSE ingat_telat_at END WHERE id = ?`)
+    .bind(judul, keterangan, jenis, rubrik, reporter, tenggat, tenggatBaru, tenggatBaru, id).run();
+  if (reporter !== t.reporter_id) await amanNotif(() => notifTugas(env, id));
   return json({ ok: true });
 }
 
@@ -262,6 +271,7 @@ async function aksiNaskah(req, env, saya, id) {
     await env.DB.prepare('DELETE FROM naskah_riwayat WHERE id = (SELECT max(id) FROM naskah_riwayat WHERE naskah_id = ?)').bind(id).run();
     throw new Galat(409, 'Status naskah sudah diubah orang lain. Muat ulang halaman.');
   }
+  await amanNotif(() => notifNaskah(env, id, b.aksi, saya, catatan));
   return json({ ok: true, status: a.ke });
 }
 

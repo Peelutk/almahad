@@ -181,6 +181,63 @@ function geserPilihan(i, arah) {
   coba(() => api('/api/pilihan/urutan', 'POST', { kelompok, ids }));
 }
 
+// ---------- pengaturan email (Admin) ----------
+const PESAN_EMAIL = {
+  ok: ['ok', 'Akun Gmail pengirim berhasil dihubungkan. Kirim email uji, lalu aktifkan notifikasi.'],
+  dibatalkan: ['galat', 'Izin Gmail dibatalkan.'],
+  izin_kurang: ['galat', 'Izin "kirim email" tidak dicentang. Ulangi dan centang izin Gmail.'],
+  tanpa_token: ['galat', 'Google tidak memberi token jangka panjang. Cabut akses aplikasi di myaccount.google.com/permissions lalu ulangi.'],
+  tanpa_kunci: ['galat', 'Secret ENKRIPSI_KUNCI belum dipasang di Worker.'],
+  bukan_admin: ['galat', 'Hanya Admin yang bisa menghubungkan akun pengirim.'],
+  domain: ['galat', 'Gunakan akun email sekolah sebagai pengirim.'],
+  sesi_masuk: ['galat', 'Proses kedaluwarsa. Silakan ulangi.'],
+  google: ['galat', 'Gagal memverifikasi akun Google. Silakan ulangi.'],
+  belum_diatur: ['galat', 'Login Google belum diatur (client secret).'],
+};
+const STATUS_EMAIL = { menunggu: ['Menunggu', 'l-diajukan'], dikirim: ['Dikirim', 'l-diajukan'], terkirim: ['Terkirim', 'l-terbit'], gagal: ['Gagal', 'l-ditolak'] };
+async function halEmail(args) {
+  const e = await api('/api/email');
+  const pesan = PESAN_EMAIL[args[0]];
+  const tanggal = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  const st = { belum: 'Belum dihubungkan', terhubung: 'Terhubung', putus: 'Terputus — hubungkan ulang' }[e.status] || e.status;
+  return `<h1>Notifikasi Email</h1><p class="sub">Email dikirim lewat Gmail dari akun pengirim yang dihubungkan Admin.</p>
+  ${pesan ? `<div class="${pesan[0] === 'ok' ? 'kartu' : 'galat'}" style="${pesan[0] === 'ok' ? 'border-color:var(--utama)' : ''}">${esc(pesan[1])}</div>` : ''}
+  ${!e.kunci_ada ? '<div class="galat">Secret ENKRIPSI_KUNCI belum dipasang di Worker — akun pengirim belum bisa dihubungkan.</div>' : ''}
+  <div class="kartu">
+    <div class="baris antara"><div><b>Akun pengirim</b><br>
+      <span class="${e.status === 'terhubung' ? '' : 'sub'}">${e.pengirim ? esc(e.pengirim) + ' · ' : ''}${esc(st)}</span>
+      ${e.galat ? `<div class="galat">${esc(e.galat)}</div>` : ''}</div>
+      <div class="baris">
+        <a class="btn ${e.status === 'terhubung' ? '' : 'utama'}" href="/api/email/hubungkan">${e.status === 'belum' ? 'Hubungkan Gmail' : 'Hubungkan ulang'}</a>
+        ${e.status !== 'belum' ? '<button class="btn bahaya" onclick="putusEmail()">Putuskan</button>' : ''}
+      </div></div>
+  </div>
+  <div class="kartu">
+    <div class="baris antara"><div><b>Kirim notifikasi</b><br><span class="sub">${e.aktif ? 'Aktif — email dikirim untuk setiap kejadian.' : 'Nonaktif — tidak ada email yang dikirim atau diantrekan.'}</span></div>
+      <div class="baris">
+        <button class="btn" onclick="ujiEmail()" ${e.status === 'terhubung' ? '' : 'disabled'}>Kirim email uji ke saya</button>
+        <button class="btn ${e.aktif ? 'bahaya' : 'utama'}" onclick="aturEmail(${!e.aktif})" ${e.status === 'terhubung' || e.aktif ? '' : 'disabled'}>${e.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
+      </div></div>
+    <p class="sub" style="margin:10px 0 0;font-size:13px">Dikirim saat: tugas baru (ke reporter) · naskah diajukan (ke Editor) · lolos editor (ke Pemred) ·
+      revisi/ditolak/terbit (ke penulis) · tenggat besok & terlambat (ke reporter, mulai 06.00 WIB). Email yang gagal dicoba ulang tiap 15 menit, maksimal 5 kali.</p>
+  </div>
+  <div class="kartu"><div class="baris antara"><b>Antrean email terbaru</b>
+    <span class="sub" style="font-size:13px">${Object.entries(e.jumlah).map(([k, n]) => `${(STATUS_EMAIL[k] || [k])[0]}: ${n}`).join(' · ') || 'kosong'}
+    ${e.jumlah.gagal ? ' <button class="btn kecil" onclick="ulangEmail()">Kirim ulang yang gagal</button>' : ''}</span></div>
+    ${e.terbaru.length ? `<div class="tabel-wadah"><table><tr><th>Waktu</th><th>Ke</th><th>Subjek</th><th>Status</th></tr>
+    ${e.terbaru.map(x => `<tr><td style="white-space:nowrap">${tanggal(x.dibuat_at)}</td><td>${esc(x.ke)}</td><td>${esc(x.subjek)}${x.galat ? `<br><small style="color:var(--bahaya)">${esc(x.galat)}</small>` : ''}</td>
+      <td><span class="lencana ${(STATUS_EMAIL[x.status] || ['', 'l-draf'])[1]}">${(STATUS_EMAIL[x.status] || [x.status])[0]}</span></td></tr>`).join('')}</table></div>`
+      : '<div class="kosong">Belum ada email.</div>'}
+  </div>`;
+}
+async function ujiEmail() {
+  try { const r = await api('/api/email/uji', 'POST'); toast(`Email uji terkirim ke ${r.ke}. Cek kotak masuk.`); }
+  catch (e) { toast(e.message); }
+}
+const aturEmail = aktif => coba(() => api('/api/email', 'PUT', { aktif }));
+const ulangEmail = () => coba(() => api('/api/email/ulang', 'POST'));
+function putusEmail() { if (confirm('Putuskan akun pengirim? Notifikasi email akan berhenti.')) coba(() => api('/api/email/putus', 'POST')); }
+
 // ---------- kerangka & rute ----------
 // [kunci, judul, boleh?, halaman, tampil di menu?]
 const MENU = [
@@ -195,6 +252,7 @@ const MENU = [
   ['anggota', 'Anggota', () => punya('admin'), halAnggota],
   ['periode', 'Periode', () => punya('admin'), halPeriode],
   ['pilihan', 'Daftar Pilihan', () => punya('admin', 'pemred'), halPilihan],
+  ['email', 'Email', () => punya('admin'), halEmail],
 ];
 let setelahTampil = null; // dipanggil setelah halaman dimasukkan ke DOM
 

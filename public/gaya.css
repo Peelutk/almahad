@@ -143,3 +143,5 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .kertas .foto img{max-height:520px;border:0;background:none}
 .kertas .foto figcaption{font-family:system-ui,sans-serif;font-style:italic;color:#555}
 .kertas .foto-gagal{color:#555}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--garis)}

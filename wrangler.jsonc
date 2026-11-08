@@ -20,8 +20,11 @@
   "vars": {
     "GOOGLE_CLIENT_ID": "272243653251-t44feo34jks8603qa3sb0e9l9qthun3b.apps.googleusercontent.com",
     "GOOGLE_HD": "daarululuumlido.com",
-    "ADMIN_AWAL": "216326@daarululuumlido.com"
+    "ADMIN_AWAL": "216326@daarululuumlido.com",
+    "APP_URL": "https://almahad.jaohongk.workers.dev"
   },
+  // Cron: coba ulang email yang gagal + pengingat tenggat (tiap 15 menit).
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Variabel/rahasia yang diatur di dashboard (GOOGLE_CLIENT_SECRET) tidak dihapus saat deploy.
   "keep_vars": true,
   "observability": { "enabled": true }

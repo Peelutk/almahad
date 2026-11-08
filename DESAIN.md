@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 10)
+# Al-Ma'had — Desain Sistem (Draf 11)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -53,6 +53,11 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-37 | Ada **halaman cetak per naskah** (selain per edisi) untuk berita/mading | Berita bisa dicetak tanpa membuat edisi | — |
 | A-38 | **Foto ditampilkan dari tautan**: tautan *file* Google Drive → gambar (thumbnail Drive, dimuat dengan login Google si pembaca); tautan *folder* Drive → bingkai grid bawaan Drive; tautan langsung berakhiran .jpg/.png/.webp/.gif → gambar; tautan lain tetap teks | Tanpa API key dan tanpa server tambahan; folder khusus akun sekolah tetap terlihat oleh pembaca yang berhak | Gambar hanya tampil bila pembaca punya akses ke file; bingkai folder bisa kosong bila browser memblokir cookie pihak ketiga dan tampilannya gaya Google |
 | A-39 | **Halaman cetak memuat gambar** dari tautan file/gambar; folder tetap dicetak sebagai tautan | Hasil cetak/PDF berisi foto | Folder tidak ikut tercetak; gambar yang gagal dimuat tercetak sebagai pesan |
+| A-40 | **Notifikasi email lewat Gmail API** dari akun `216326@daarululuumlido.com`; Admin menghubungkan akun sekali lewat tombol (izin `gmail.send`) | Gratis, jarang masuk spam ke sesama akun sekolah, tanpa layanan baru | OAuth app harus *In production* (status *Testing* membuat izin kedaluwarsa tiap 7 hari); email tercatat di Terkirim akun tersebut |
+| A-41 | Refresh token Gmail disimpan **terenkripsi (AES-GCM)** di D1; kuncinya secret Worker `ENKRIPSI_KUNCI` | Token tidak terbaca walau database bocor; tidak ada token yang lewat chat | Bila `ENKRIPSI_KUNCI` diganti, akun pengirim harus dihubungkan ulang |
+| A-42 | Kejadian yang dikirimi email: tugas baru/ganti reporter → reporter; naskah diajukan → semua Editor; lolos editor → semua Pemred; revisi/ditolak/terbit → penulis; pelaku tidak menerima email atas aksinya sendiri | Setiap orang tahu saat gilirannya bertindak | Editor/Pemred bisa menerima banyak email bila naskah ramai |
+| A-43 | **Pengingat tenggat** H-1 dan saat terlambat, masing-masing sekali per tugas (diulang bila tenggat diubah), mulai 06.00 WIB, lewat Cron tiap 15 menit | Reporter diingatkan tanpa kerja manual | — |
+| A-44 | Email masuk **antrean**: dikirim langsung, yang gagal dicoba ulang maksimal 5 kali lalu bisa dikirim ulang manual; notifikasi **nonaktif secara bawaan** dan tidak mengantrekan apa pun saat nonaktif/terputus | Aksi utama tidak pernah gagal karena email; tidak ada banjir email saat diaktifkan | Kejadian selama nonaktif tidak akan pernah dikirimi email |
 
 ## 3. Mindmap
 

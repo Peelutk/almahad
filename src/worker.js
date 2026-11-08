@@ -5,6 +5,7 @@ import {
   Galat, json, alihkan, bacaCookie, buatCookie, acak, sha256, dekodeJwt, bacaJson, teks, daftarPeran, wajib,
 } from './umum.js';
 import { apiRedaksi } from './redaksi.js';
+import { apiEmail, paramGmail, simpanPengirim, prosesAntrean, jadwal } from './email.js';
 
 const KELOMPOK = { rubrik_berita: 'Rubrik berita', rubrik_majalah: 'Rubrik majalah' };
 const UMUR_SESI = 30 * 24 * 3600; // detik
@@ -60,9 +61,10 @@ async function selesaiMasuk(env, email, namaGoogle) {
 }
 
 // ---------- Google OAuth ----------
-function googleMulai(req, env) {
+// mode 'gmail' = Admin menghubungkan akun pengirim email (izin gmail.send); state diawali 'g.'
+function googleMulai(req, env, mode) {
   const url = new URL(req.url);
-  const state = acak(24);
+  const state = (mode === 'gmail' ? 'g.' : '') + acak(24);
   const p = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
     redirect_uri: `${url.origin}/api/google/kembali`,
@@ -71,6 +73,7 @@ function googleMulai(req, env) {
     state,
     hd: domain(env),
     prompt: 'select_account',
+    ...(mode === 'gmail' ? paramGmail(env) : {}),
   });
   return alihkan(`${env.GOOGLE_AUTH_URL || 'https://accounts.google.com/o/oauth2/v2/auth'}?${p}`,
     { 'set-cookie': buatCookie(COOKIE_STATE, state, 600, '/api/google') });
@@ -79,8 +82,10 @@ function googleMulai(req, env) {
 async function googleKembali(req, env) {
   const url = new URL(req.url);
   const hapusState = buatCookie(COOKIE_STATE, '', 0, '/api/google');
-  const gagal = kode => alihkan(`/?galat=${kode}`, { 'set-cookie': hapusState });
-  const state = url.searchParams.get('state');
+  const state = url.searchParams.get('state') || '';
+  const modeGmail = state.startsWith('g.');
+  const gagal = kode => alihkan(modeGmail ? `/#email/${kode}` : `/?galat=${kode}`, { 'set-cookie': hapusState });
+  if (modeGmail && url.searchParams.get('error')) return gagal('dibatalkan');
   const kode = url.searchParams.get('code');
   if (!state || !kode || state !== bacaCookie(req, COOKIE_STATE)) return gagal('sesi_masuk');
   if (!env.GOOGLE_CLIENT_SECRET) return gagal('belum_diatur');
@@ -105,6 +110,16 @@ async function googleKembali(req, env) {
       !(id.exp > Date.now() / 1000) ||
       id.email_verified !== true) return gagal('google');
   if (id.hd !== hd || !email.endsWith('@' + hd)) return gagal('domain');
+
+  if (modeGmail) {
+    // Hanya Admin yang sedang masuk boleh menghubungkan akun pengirim.
+    const saya = await ambilSaya(req, env);
+    if (!saya || !saya.peran.includes('admin')) return gagal('bukan_admin');
+    if (!env.ENKRIPSI_KUNCI) return gagal('tanpa_kunci');
+    const g = await simpanPengirim(env, email, data);
+    if (g) return gagal(g);
+    return alihkan('/#email/ok', { 'set-cookie': hapusState });
+  }
 
   const h = await selesaiMasuk(env, email, id.name);
   if (h.galat) return gagal(h.galat);
@@ -267,6 +282,11 @@ async function api(req, env, url) {
   const m = req.method;
 
   if (p === '/api/google/mulai' && m === 'GET') return googleMulai(req, env);
+  if (p === '/api/email/hubungkan' && m === 'GET') {
+    const s = await ambilSaya(req, env);
+    if (!s || !s.peran.includes('admin')) return alihkan('/#email/bukan_admin');
+    return googleMulai(req, env, 'gmail');
+  }
   if (p === '/api/google/kembali' && m === 'GET') return googleKembali(req, env);
 
   // Masuk uji: HANYA saat pengujian lokal (UJI_LOGIN=1 di .dev.vars dan host localhost).
@@ -321,6 +341,10 @@ async function api(req, env, url) {
   r = p.match(/^\/api\/pilihan\/(\d+)$/);
   if (r && m === 'PUT') { wajib(saya, 'admin', 'pemred'); return ubahPilihan(req, env, Number(r[1])); }
 
+  // Pengaturan email (Admin).
+  const hasilEmail = await apiEmail(req, env, saya, p, m);
+  if (hasilEmail) return hasilEmail;
+
   // Modul redaksi: tugas, naskah, antrean, edisi.
   const hasil = await apiRedaksi(req, env, saya, p, m);
   if (hasil) return hasil;
@@ -329,16 +353,23 @@ async function api(req, env, url) {
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
     try {
       await pastikanSkema(env.DB);
-      return await api(req, env, url);
+      const res = await api(req, env, url);
+      // Setelah perubahan data, kirim email yang baru diantrekan tanpa menahan jawaban.
+      if (req.method !== 'GET' && res.ok && ctx) ctx.waitUntil(prosesAntrean(env).catch(e => console.error('email', e)));
+      return res;
     } catch (e) {
       if (e instanceof Galat) return json({ galat: e.message }, e.status);
       console.error(e);
       return json({ galat: 'Terjadi kesalahan pada server.' }, 500);
     }
+  },
+  // Cron (lihat wrangler.jsonc): coba ulang email & pengingat tenggat.
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil((async () => { await pastikanSkema(env.DB); await jadwal(env); })().catch(e => console.error('jadwal', e)));
   },
 };

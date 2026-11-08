@@ -9,7 +9,7 @@ Sistem redaksi internal organisasi jurnalistik santri — Cloudflare Workers + D
 ## Status
 
 Semua modul tersedia: login Google, Anggota & peran, Periode, Daftar Pilihan, Tugas Liputan,
-Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah).
+Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah), Notifikasi Email (Gmail API + Cron).
 
 ## Struktur
 
@@ -19,6 +19,7 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
 | `src/worker.js` | API `/api/*`: login Google, sesi, anggota, periode, daftar pilihan |
 | `src/redaksi.js` | API tugas, naskah, antrean, edisi, ringkasan dasbor |
 | `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
+| `src/email.js` | Notifikasi email: Gmail API, antrean, pengingat tenggat (Cron), pengaturan email |
 | `src/skema.js` | Migrasi database — berjalan otomatis pada permintaan pertama |
 | `public/` | Tampilan aplikasi (HTML/CSS/JS tanpa build); `redaksi.js` = halaman modul redaksi |
 
@@ -30,7 +31,11 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
    - Authorized redirect URI: `https://almahad.jaohongk.workers.dev/api/google/kembali`
 4. **Rahasia Worker** (dashboard → `almahad` → Settings → Variables and Secrets → *Secret*):
    - `GOOGLE_CLIENT_SECRET` = client secret dari Google. **Jangan** ditulis di repo atau dikirim lewat chat.
-5. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
+5. **Notifikasi email** (sekali):
+   - Secret `ENKRIPSI_KUNCI` = teks acak panjang (kunci enkripsi token Gmail). Jangan diganti setelah dipakai.
+   - Google Cloud Console (proyek OAuth yang sama): aktifkan **Gmail API**; di *OAuth consent screen → Data access* tambahkan scope `.../auth/gmail.send`; status aplikasi **In production**.
+   - Masuk sebagai Admin → **Pengaturan → Email** → *Hubungkan Gmail* dengan akun pengirim → *Kirim email uji* → *Aktifkan*.
+6. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
 
 ## Aturan keamanan
 
