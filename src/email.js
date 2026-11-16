@@ -6,6 +6,7 @@
 import { Galat, json, bacaJson, wajib } from './umum.js';
 
 const SCOPE_GMAIL = 'https://www.googleapis.com/auth/gmail.send';
+export const SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.file'; // hanya file buatan aplikasi (A-55)
 const MAKS_PERCOBAAN = 5;
 const hariIni = (geser = 0) => new Date(Date.now() + 7 * 3600e3 + geser * 864e5).toISOString().slice(0, 10);
 const jamWib = () => new Date(Date.now() + 7 * 3600e3).getUTCHours();
@@ -13,6 +14,7 @@ const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '
 const tglId = s => s ? s.split('-').reverse().join('-') : '';
 
 // ---------- pengaturan ----------
+export { aturStmt };
 export async function ambilAtur(env, kunci) {
   const r = await env.DB.prepare('SELECT nilai FROM pengaturan WHERE kunci = ?').bind(kunci).first();
   return r ? r.nilai : null;
@@ -43,24 +45,33 @@ async function dekripsi(env, s) {
 
 // ---------- menghubungkan akun pengirim (dipanggil dari alur OAuth di worker.js) ----------
 export function paramGmail(env) {
-  return { scope: `openid email ${SCOPE_GMAIL}`, access_type: 'offline', prompt: 'consent', login_hint: env.ADMIN_AWAL || '' };
+  return { scope: `openid email ${SCOPE_GMAIL} ${SCOPE_DRIVE}`, access_type: 'offline', prompt: 'consent', login_hint: env.ADMIN_AWAL || '' };
 }
 export async function simpanPengirim(env, email, data) {
   if (!String(data.scope || '').split(' ').includes(SCOPE_GMAIL)) return 'izin_kurang';
   if (!data.refresh_token) return 'tanpa_token';
+  const izinDrive = String(data.scope || '').split(' ').includes(SCOPE_DRIVE);
+  // Akun berbeda dari pemilik folder → folder Drive milik akun lama tidak bisa dipakai lagi.
+  // (drive_akun tidak ikut dihapus saat akun diputus, agar pergantian akun tetap terdeteksi.)
+  const akunDrive = await ambilAtur(env, 'drive_akun');
+  const hapusFolder = akunDrive && akunDrive.toLowerCase() !== email.toLowerCase()
+    ? [env.DB.prepare("DELETE FROM pengaturan WHERE kunci LIKE 'drive_folder%'")] : [];
   await env.DB.batch([
+    ...hapusFolder,
+    aturStmt(env, 'drive_akun', email),
+    aturStmt(env, 'drive_izin', izinDrive ? '1' : '0'),
     aturStmt(env, 'gmail_token', await enkripsi(env, data.refresh_token)),
     aturStmt(env, 'gmail_pengirim', email),
     aturStmt(env, 'gmail_status', 'terhubung'),
     aturStmt(env, 'gmail_galat', null),
   ]);
   cacheAkses = null;
-  return null;
+  return izinDrive ? null : 'ok_tanpa_drive';
 }
 
 // ---------- kirim lewat Gmail API ----------
 let cacheAkses = null; // { token, habis }
-async function tokenAkses(env) {
+export async function tokenAkses(env) {
   if (cacheAkses && cacheAkses.habis > Date.now() + 60e3) return cacheAkses.token;
   const enc = await ambilAtur(env, 'gmail_token');
   if (!enc) throw new Error('Akun pengirim belum dihubungkan.');
@@ -255,6 +266,8 @@ export async function apiEmail(req, env, saya, p, m) {
     return json({
       status: status || 'belum', pengirim: await ambilAtur(env, 'gmail_pengirim'), galat: await ambilAtur(env, 'gmail_galat'),
       aktif: (await ambilAtur(env, 'email_aktif')) === '1', kunci_ada: !!env.ENKRIPSI_KUNCI,
+      drive: status === 'terhubung' && (await ambilAtur(env, 'drive_izin')) === '1',
+      drive_folder: await ambilAtur(env, 'drive_folder'),
       jumlah: Object.fromEntries(jumlah.map(j => [j.status, j.n])), terbaru,
     });
   }
@@ -275,7 +288,7 @@ export async function apiEmail(req, env, saya, p, m) {
     return json({ ok: true, ke: saya.email });
   }
   if (p === '/api/email/putus' && m === 'POST') {
-    await env.DB.batch(['gmail_token', 'gmail_pengirim', 'gmail_status', 'gmail_galat'].map(k => aturStmt(env, k, null))
+    await env.DB.batch(['gmail_token', 'gmail_pengirim', 'gmail_status', 'gmail_galat', 'drive_izin'].map(k => aturStmt(env, k, null))
       .concat([aturStmt(env, 'email_aktif', '0')]));
     cacheAkses = null;
     return json({ ok: true });

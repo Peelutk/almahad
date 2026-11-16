@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 13)
+# Al-Ma'had — Desain Sistem (Draf 14)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -68,6 +68,12 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-52 | Alur upload: **pilih file → pilih peran → pratinjau → Simpan**. Peran (Reporter/Editor/Pemred, **tanpa Admin**) berlaku untuk semua baris. Pratinjau menandai tiap baris: akan ditambahkan / dilewati (NIS atau email sudah terdaftar, atau ganda di file) / salah (beserta alasan); belum ada yang tersimpan sebelum Simpan. **Duplikat dilewati**, data lama tidak diubah | Kesalahan terlihat sebelum tersimpan; CSV tidak bisa menimpa data atau membuat Admin | Satu file = satu peran; peran campuran diubah manual sesudahnya |
 | A-53 | **Email otomatis `(NIS)@daarululuumlido.com`**: di CSV selalu; di form manual terisi otomatis saat NIS diketik tetapi tetap bisa diubah atau dikosongkan | Anggota langsung bisa login Google & menerima notifikasi | Bila email sekolah santri tidak sama dengan NIS, harus dibetulkan manual (login NIS tetap jalan) |
 | A-54 | **Password awal tanpa hash**: anggota yang punya NIS tetapi belum punya hash password berarti *password awal = NIS* (dicocokkan langsung dengan NIS, tetap wajib ganti). Berlaku untuk tambah anggota, CSV, ubah NIS, dan reset. Hash PBKDF2 baru dibuat saat anggota mengganti password | Upload ratusan baris tidak melebihi batas CPU Worker gratis; tambah/reset lebih ringan | Satu cabang tambahan di kode login & ganti password (diuji khusus) |
+| A-55 | **Upload foto ke Google Drive** memakai akun yang sama dengan pengirim email: koneksi Google ditambah izin `drive.file` (hanya file buatan aplikasi). Halaman *Pengaturan → Google (Email & Drive)*; Admin menekan *Hubungkan ulang* sekali. Upload tidak bergantung pada notifikasi email aktif/nonaktif | Satu akun, satu koneksi | Bila koneksi dicabut, upload & email sama-sama berhenti; ganti akun → foto lama tidak bisa ditampilkan |
+| A-56 | Form naskah: **Upload foto** dan **tautan** sama-sama tersedia; foto upload masuk ke daftar foto naskah dan keterangan tiap foto bisa diisi; batas jumlah foto per naskah tetap | Foto & folder Drive lama tetap jalan | Dua cara di layar |
+| A-57 | **Ukuran asli**, maks 20 MB per foto; JPG/PNG/WEBP/HEIC/GIF; bisa pilih beberapa sekaligus, dengan bilah progres; dialirkan langsung Worker → Drive (upload *resumable*) | Kualitas penuh untuk majalah | Lambat di jaringan pondok; kuota Drive lebih cepat terpakai |
+| A-58 | Drive: folder **"Al-Ma'had – Foto"** dibuat otomatis, subfolder per bulan (`2026-11`); nama file `tanggal-jam_nama-asli` | Rapi tanpa perlu naskah tersimpan dulu | Tidak dikelompokkan per naskah |
+| A-59 | **Foto ditampilkan lewat aplikasi** (`/api/foto/<id>`), file Drive tetap privat; hanya anggota yang sudah masuk (termasuk login NIS), juga di halaman cetak. Yang ditampilkan pratinjau Google ±1600 px (disimpan di cache browser 1 hari); *Unduh asli* untuk file penuh. Hanya file yang tercatat di tabel `foto_upload` yang dilayani (migrasi 5 = tabel baru saja) | Privat & ringan; tidak perlu login Google | Tiap tampilan memakai kuota permintaan Worker; pratinjau Google kadang baru siap beberapa detik setelah upload (sementara itu file asli yang dikirim). Cache Cloudflare tidak dipakai karena tidak aktif di `*.workers.dev` |
+| A-60 | Menghapus foto dari naskah **tidak** menghapus file di Drive | Aman dari salah hapus | File tak terpakai perlu dibersihkan manual di Drive |
 
 ## 3. Mindmap
 
@@ -93,6 +99,7 @@ mindmap
       Naskah jenis berita
       Rubrik
       Tautan foto
+      Upload foto ke Drive
     Majalah
       Edisi
       Naskah jenis majalah
@@ -171,7 +178,8 @@ flowchart TD
 | `pilihan` | id, kelompok (mis. `rubrik_berita`, `rubrik_majalah`), nilai, urutan, aktif — modul Daftar Pilihan (A-20) |
 | `tugas` | id, judul, keterangan, jenis, rubrik_id → `pilihan`, pemberi_id, reporter_id, tenggat (wajib), status (`baru`/`dikerjakan`/`selesai`/`batal`); "terlambat" dihitung dari tenggat, tidak disimpan |
 | `naskah` | id, jenis (`berita`/`majalah`), judul, rubrik_id → `pilihan`, penulis_id, tugas_id (boleh kosong), isi, status, dibuat_at, diubah_at |
-| `naskah_foto` | id, naskah_id, tautan, keterangan |
+| `naskah_foto` | id, naskah_id, tautan (alamat web, atau `/api/foto/<id>` untuk foto upload), keterangan |
+| `foto_upload` | id, drive_id (unik), nama, mime, ukuran, pengunggah_id, dibuat_at — foto yang diupload ke Drive (A-59) |
 | `naskah_riwayat` | id, naskah_id, dari_status, ke_status, oleh_id, catatan, waktu |
 | `edisi` | id, nomor, tema, bulan_terbit, status (`disusun`/`dikunci`/`terbit`) |
 | `edisi_naskah` | edisi_id, naskah_id, urutan |

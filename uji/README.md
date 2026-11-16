@@ -9,6 +9,7 @@ UJI_LOGIN=1
 GOOGLE_CLIENT_SECRET=rahasia-uji
 GOOGLE_TOKEN_URL=http://127.0.0.1:8791/token
 GMAIL_API_URL=http://127.0.0.1:8791
+DRIVE_API_URL=http://127.0.0.1:8791
 ENKRIPSI_KUNCI=kunci-uji-lokal
 ```
 
@@ -25,6 +26,8 @@ Jalankan: `bash uji/jalankan.sh`
 | `migrasi.sh <commit>` | Buat DB berisi data dengan kode commit lama, lalu migrasikan dengan kode sekarang dan bandingkan |
 | `klik-nis.mjs` | Uji klik di Chrome: masuk NIS, wajib ganti password, Akun saya |
 | `klik-csv.mjs` | Uji klik di Chrome: Upload CSV (file ANSI), pratinjau, simpan, email otomatis di form |
-| `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail API (port 8791) |
+| `foto.mjs` | Upload foto ke Drive (tiruan): izin, folder, file 20 MB, tampil pratinjau/asli, akses |
+| `klik-foto.mjs` | Uji klik di Chrome: upload foto (progres, tolak bukan foto / > 20 MB), keterangan, simpan, cetak, halaman Google |
+| `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail API + Drive API (port 8791) |
 
 `/api/uji/masuk` hanya aktif bila `UJI_LOGIN=1` **dan** host `localhost` — tidak berlaku di Worker asli.

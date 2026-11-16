@@ -337,9 +337,10 @@ function geserPilihan(i, arah) {
 
 // ---------- pengaturan email (Admin) ----------
 const PESAN_EMAIL = {
-  ok: ['ok', 'Akun Gmail pengirim berhasil dihubungkan. Kirim email uji, lalu aktifkan notifikasi.'],
+  ok: ['ok', 'Akun Google berhasil dihubungkan (Email & Drive). Kirim email uji, lalu aktifkan notifikasi bila perlu. Upload foto sudah bisa dipakai.'],
+  ok_tanpa_drive: ['galat', 'Akun terhubung untuk email, tetapi izin Google Drive tidak dicentang — upload foto belum bisa dipakai. Tekan Hubungkan ulang dan centang izin Drive.'],
   dibatalkan: ['galat', 'Izin Gmail dibatalkan.'],
-  izin_kurang: ['galat', 'Izin "kirim email" tidak dicentang. Ulangi dan centang izin Gmail.'],
+  izin_kurang: ['galat', 'Izin "kirim email" tidak dicentang. Ulangi dan centang semua izin.'],
   tanpa_token: ['galat', 'Google tidak memberi token jangka panjang. Cabut akses aplikasi di myaccount.google.com/permissions lalu ulangi.'],
   tanpa_kunci: ['galat', 'Secret ENKRIPSI_KUNCI belum dipasang di Worker.'],
   bukan_admin: ['galat', 'Hanya Admin yang bisa menghubungkan akun pengirim.'],
@@ -354,17 +355,22 @@ async function halEmail(args) {
   const pesan = PESAN_EMAIL[args[0]];
   const tanggal = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   const st = { belum: 'Belum dihubungkan', terhubung: 'Terhubung', putus: 'Terputus — hubungkan ulang' }[e.status] || e.status;
-  return `<h1>Notifikasi Email</h1><p class="sub">Email dikirim lewat Gmail dari akun pengirim yang dihubungkan Admin.</p>
+  return `<h1>Google (Email & Drive)</h1><p class="sub">Satu akun Google sekolah dipakai untuk mengirim notifikasi email (Gmail) dan menyimpan foto upload (Google Drive).</p>
   ${pesan ? `<div class="${pesan[0] === 'ok' ? 'kartu' : 'galat'}" style="${pesan[0] === 'ok' ? 'border-color:var(--utama)' : ''}">${esc(pesan[1])}</div>` : ''}
   ${!e.kunci_ada ? '<div class="galat">Secret ENKRIPSI_KUNCI belum dipasang di Worker — akun pengirim belum bisa dihubungkan.</div>' : ''}
   <div class="kartu">
-    <div class="baris antara"><div><b>Akun pengirim</b><br>
+    <div class="baris antara"><div><b>Akun Google</b><br>
       <span class="${e.status === 'terhubung' ? '' : 'sub'}">${e.pengirim ? esc(e.pengirim) + ' · ' : ''}${esc(st)}</span>
       ${e.galat ? `<div class="galat">${esc(e.galat)}</div>` : ''}</div>
       <div class="baris">
-        <a class="btn ${e.status === 'terhubung' ? '' : 'utama'}" href="/api/email/hubungkan">${e.status === 'belum' ? 'Hubungkan Gmail' : 'Hubungkan ulang'}</a>
+        <a class="btn ${e.status === 'terhubung' && e.drive ? '' : 'utama'}" href="/api/email/hubungkan">${e.status === 'belum' ? 'Hubungkan akun Google' : 'Hubungkan ulang'}</a>
         ${e.status !== 'belum' ? '<button class="btn bahaya" onclick="putusEmail()">Putuskan</button>' : ''}
       </div></div>
+  </div>
+  <div class="kartu"><b>Upload foto (Google Drive)</b><br>
+    <span class="${e.drive ? '' : 'sub'}">${e.drive ? 'Aktif — foto naskah disimpan di folder <i>Al-Ma&#39;had – Foto</i>' + (e.drive_folder ? ` (<a href="https://drive.google.com/drive/folders/${esc(e.drive_folder)}" target="_blank" rel="noopener noreferrer">buka folder ↗</a>)` : '') + '.'
+      : e.status === 'terhubung' ? 'Belum aktif — izin Google Drive belum diberikan. Tekan <b>Hubungkan ulang</b> dan centang izin Drive.' : 'Belum aktif — hubungkan akun Google terlebih dahulu.'}</span>
+    <p class="sub" style="margin:8px 0 0;font-size:13px">Foto hanya bisa dilihat anggota lewat aplikasi (file di Drive tetap privat). Menghapus foto dari naskah tidak menghapus file di Drive.</p>
   </div>
   <div class="kartu">
     <div class="baris antara"><div><b>Kirim notifikasi</b><br><span class="sub">${e.aktif ? 'Aktif — email dikirim untuk setiap kejadian.' : 'Nonaktif — tidak ada email yang dikirim atau diantrekan.'}</span></div>
@@ -390,7 +396,7 @@ async function ujiEmail() {
 }
 const aturEmail = aktif => coba(() => api('/api/email', 'PUT', { aktif }));
 const ulangEmail = () => coba(() => api('/api/email/ulang', 'POST'));
-function putusEmail() { if (confirm('Putuskan akun pengirim? Notifikasi email akan berhenti.')) coba(() => api('/api/email/putus', 'POST')); }
+function putusEmail() { if (confirm('Putuskan akun Google? Notifikasi email berhenti dan foto upload tidak bisa ditampilkan atau diupload sampai dihubungkan lagi.')) coba(() => api('/api/email/putus', 'POST')); }
 
 // ---------- kerangka & rute ----------
 // [kunci, judul, boleh?, halaman, tampil di menu?]
@@ -406,7 +412,7 @@ const MENU = [
   ['anggota', 'Anggota', () => punya('admin'), halAnggota],
   ['periode', 'Periode', () => punya('admin'), halPeriode],
   ['pilihan', 'Daftar Pilihan', () => punya('admin', 'pemred'), halPilihan],
-  ['email', 'Email', () => punya('admin'), halEmail],
+  ['email', 'Google', () => punya('admin'), halEmail],
   ['akun', 'Akun saya', () => true, halAkun, false],
 ];
 let setelahTampil = null; // dipanggil setelah halaman dimasukkan ke DOM

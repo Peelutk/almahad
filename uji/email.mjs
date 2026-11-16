@@ -56,7 +56,7 @@ let r = await fetch(`${B}/api/email/hubungkan`, { redirect: 'manual' });
 cek('hubungkan tanpa login → bukan_admin', r.headers.get('location') === '/#email/bukan_admin');
 r = await fetch(`${B}/api/email/hubungkan`, { redirect: 'manual', headers: { cookie: kR } });
 cek('hubungkan oleh reporter → bukan_admin', r.headers.get('location') === '/#email/bukan_admin');
-const SCOPE = 'openid email https://www.googleapis.com/auth/gmail.send';
+const SCOPE = 'openid email https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/drive.file';
 let h = await hubungkan(kA, { klaim: klaim(`216326@${D}`), refresh_token: 'rt-1', scope: SCOPE });
 const lok = h.mulai.headers.get('location') || '';
 cek('redirect Google: izin gmail.send, offline, consent, login_hint', lok.includes(encodeURIComponent('https://www.googleapis.com/auth/gmail.send')) && lok.includes('access_type=offline') && lok.includes('prompt=consent') && lok.includes('login_hint=216326') && /state=g\./.test(lok), lok);

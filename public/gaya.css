@@ -150,3 +150,6 @@ dialog.lebar{width:min(760px,calc(100vw - 32px))}
 .pemisah::before,.pemisah::after{content:"";flex:1;border-top:1px solid var(--garis)}
 a.siapa{text-decoration:none}
 a.siapa:hover{color:var(--utama)}
+.progres-foto{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;margin:4px 0}
+.progres-foto progress{flex:1;min-width:120px;accent-color:var(--utama)}
+.progres-foto.gagal .ket{color:var(--bahaya)}

@@ -18,7 +18,7 @@ const waktu = s => {
   return isNaN(d) ? s : d.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 const jenisNama = j => j === 'berita' ? 'Berita' : 'Majalah';
-const tautanAman = u => /^https?:\/\//i.test(u) ? u : '#';
+const tautanAman = u => /^https?:\/\//i.test(u) || /^\/api\/foto\/\d+$/.test(u) ? u : '#';
 
 // ---------- Foto: tautan Google Drive / gambar langsung → tampilan gambar ----------
 // File Drive  → thumbnail Drive (dimuat dengan login Google si pembaca).
@@ -26,6 +26,7 @@ const tautanAman = u => /^https?:\/\//i.test(u) ? u : '#';
 // Tautan langsung berakhiran .jpg/.png/... → <img>.
 const ID_DRIVE = /^[A-Za-z0-9_-]{10,}$/;
 function infoFoto(tautan) {
+  if (/^\/api\/foto\/\d+$/.test(tautan)) return { jenis: 'unggah', src: tautan }; // upload ke Drive lewat aplikasi (A-59)
   let u; try { u = new URL(tautan); } catch { return { jenis: 'lain' }; }
   if (!/^https?:$/.test(u.protocol)) return { jenis: 'lain' };
   const host = u.hostname.toLowerCase();
@@ -59,6 +60,12 @@ function tampilFoto(f, mode = 'baca') {
   const ket = f.keterangan ? `<figcaption>${esc(f.keterangan)}</figcaption>` : '';
   const lebar = mode === 'cetak' ? 1600 : mode === 'kecil' ? 400 : 1200;
   const muat = mode === 'cetak' ? 'eager' : 'lazy';
+  if (info.jenis === 'unggah') {
+    const unduh = mode === 'cetak' ? '' : `<a href="${esc(f.tautan)}?asli=1" download>Unduh asli</a>`;
+    const kap = mode === 'kecil' ? '' : (f.keterangan || unduh) ? `<figcaption>${f.keterangan ? esc(f.keterangan) : ''}${f.keterangan && unduh ? ' · ' : ''}${unduh}</figcaption>` : '';
+    return `<figure class="foto foto-${mode}"><a href="${esc(f.tautan)}" target="_blank" rel="noopener">
+      <img src="${esc(f.tautan)}" alt="${esc(f.keterangan || 'Foto')}" loading="${muat}" onerror="fotoGagal(this)"></a>${kap}</figure>`;
+  }
   if (info.jenis === 'file' || info.jenis === 'gambar') {
     const src = info.jenis === 'file' ? `https://drive.google.com/thumbnail?id=${info.id}&sz=w${lebar}` : info.src;
     return `<figure class="foto foto-${mode}"><a href="${tautan}" target="_blank" rel="noopener noreferrer">
@@ -212,8 +219,13 @@ async function halNaskahDetail(args) {
         </div>
         ${n.tugas ? `<p class="sub" style="margin:8px 0 0">Dari tugas: <b>${esc(n.tugas.judul)}</b> (tenggat ${tgl(n.tugas.tenggat)})</p>` : ''}
         <label>Isi naskah</label><textarea name="isi" maxlength="60000" placeholder="Pisahkan paragraf dengan baris kosong.">${esc(n.isi)}</textarea>
-        <label>Tautan foto (Google Drive, dll.)</label>
+        <label>Foto</label>
         <div id="daftar-foto"></div>
+        <div class="baris" style="margin-bottom:8px"><label class="btn kecil" style="margin:0;cursor:pointer">📤 Upload foto
+          <input type="file" id="foto-file" multiple accept="${FOTO_ACCEPT}" hidden onchange="uploadFoto(this.files);this.value=''"></label>
+          <span class="sub" style="font-size:13px">ukuran asli, maks 20 MB per foto — disimpan di Google Drive</span></div>
+        <div id="foto-progres"></div>
+        <label style="margin-top:4px">atau tempel tautan (Google Drive, dll.)</label>
         <div class="baris"><input type="url" id="foto-tautan" placeholder="https://drive.google.com/..." style="flex:2;min-width:180px"><input type="text" id="foto-ket" placeholder="Keterangan foto" maxlength="200" style="flex:1;min-width:120px"><button class="btn kecil" type="button" onclick="tambahFoto()">+ Tambah</button></div>
       </form>` : `<div class="isi-baca">${paragraf(n.isi) || '<p class="sub">(isi kosong)</p>'}</div>
         ${n.foto.length ? `<b>Foto</b><div class="galeri">${n.foto.map(f => tampilFoto(f)).join('')}</div>` : ''}`}
@@ -234,6 +246,7 @@ async function halNaskahDetail(args) {
 function gambarFoto() {
   const el = $('#daftar-foto'); if (!el) return;
   el.innerHTML = fotoKini.length ? `<div class="galeri">${fotoKini.map((f, i) => `<div class="foto-item">${tampilFoto(f, 'kecil')}
+    <input type="text" placeholder="Keterangan foto" maxlength="200" value="${esc(f.keterangan || '')}" oninput="fotoKini[${i}].keterangan=this.value" style="margin:4px 0">
     <button class="btn kecil" type="button" onclick="fotoKini.splice(${i},1);gambarFoto()">Hapus</button></div>`).join('')}</div>` : '';
 }
 function pasangFormNaskah() {
@@ -246,6 +259,47 @@ function tambahFoto() {
   if (!/^https?:\/\/\S+$/i.test(t)) return toast('Tautan foto harus diawali https://');
   fotoKini.push({ tautan: t, keterangan: k });
   $('#foto-tautan').value = ''; $('#foto-ket').value = ''; gambarFoto();
+}
+// ---------- upload foto ke Drive (A-55..A-57) ----------
+const MAKS_FOTO = 20, MAKS_UKURAN_FOTO = 20 * 1024 * 1024;
+const JENIS_FOTO = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', gif: 'image/gif' };
+const FOTO_ACCEPT = '.jpg,.jpeg,.png,.webp,.heic,.heif,.gif,image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif';
+const ukuranMb = b => (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
+function kirimFoto(file, jenis, kemajuan) {
+  return new Promise((selesai, gagal) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/foto');
+    x.setRequestHeader('x-almahad', '1');
+    x.setRequestHeader('content-type', jenis);
+    x.setRequestHeader('x-nama-file', encodeURIComponent(file.name));
+    x.upload.onprogress = e => e.lengthComputable && kemajuan(e.loaded / e.total);
+    x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch {} x.status === 201 ? selesai(d) : gagal(new Error(d.galat || `Upload gagal (${x.status}).`)); };
+    x.onerror = () => gagal(new Error('Koneksi terputus saat upload.'));
+    x.send(file);
+  });
+}
+async function uploadFoto(files) {
+  const wadah = $('#foto-progres');
+  for (const file of [...files]) {
+    const baris = document.createElement('div');
+    baris.className = 'progres-foto';
+    baris.innerHTML = `<span>${esc(file.name)} (${ukuranMb(file.size)})</span><progress max="1" value="0"></progress><span class="ket"></span>`;
+    wadah.append(baris);
+    const ket = baris.querySelector('.ket'), bar = baris.querySelector('progress');
+    const gagal = m => { baris.classList.add('gagal'); bar.remove(); ket.textContent = m; };
+    const ext = file.name.split('.').pop().toLowerCase();
+    const jenis = Object.values(JENIS_FOTO).includes(file.type) ? file.type : (JENIS_FOTO[ext] || '');
+    if (!jenis) { gagal('bukan foto JPG/PNG/WEBP/HEIC/GIF'); continue; }
+    if (file.size > MAKS_UKURAN_FOTO) { gagal('lebih dari 20 MB'); continue; }
+    if (fotoKini.length >= MAKS_FOTO) { gagal(`maksimal ${MAKS_FOTO} foto per naskah`); continue; }
+    try {
+      const d = await kirimFoto(file, jenis, v => { bar.value = v; ket.textContent = Math.round(v * 100) + '%'; });
+      fotoKini.push({ tautan: d.tautan, keterangan: '' });
+      gambarFoto(); baris.remove();
+    } catch (e) { gagal(e.message); }
+  }
+  if (!wadah.querySelector('.gagal')) wadah.innerHTML = '';
+  else toast('Sebagian foto gagal diupload — lihat keterangan di bawah tombol Upload.');
 }
 function galatNaskah(m) { const g = $('#f-galat'); g.hidden = false; g.textContent = m; }
 async function simpanNaskahData() {

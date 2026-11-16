@@ -38,6 +38,8 @@ function cekFoto(v) {
   if (v.length > MAKS_FOTO) throw new Galat(400, `Maksimal ${MAKS_FOTO} tautan foto.`);
   return v.map(f => {
     const tautan = teks(f?.tautan, 'Tautan foto', 500);
+    // Foto hasil upload ke Drive (A-59)
+    if (/^\/api\/foto\/\d+$/.test(tautan)) return { tautan, keterangan: teks(f?.keterangan, 'Keterangan foto', 200, false) };
     let u;
     try { u = new URL(tautan); } catch { throw new Galat(400, 'Tautan foto harus berupa alamat web (https://…).'); }
     if (!['https:', 'http:'].includes(u.protocol)) throw new Galat(400, 'Tautan foto harus diawali https://');

@@ -162,6 +162,22 @@ export const MIGRASI = [
       `CREATE INDEX IF NOT EXISTS masuk_gagal_ip ON masuk_gagal(ip, waktu)`,
     ],
   },
+  {
+    // Hanya tabel baru (A-59): foto yang diupload ke Drive lewat aplikasi.
+    versi: 5,
+    nama: 'Upload foto ke Google Drive',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS foto_upload (
+        id INTEGER PRIMARY KEY,
+        drive_id TEXT NOT NULL UNIQUE,
+        nama TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        ukuran INTEGER NOT NULL,
+        pengunggah_id INTEGER REFERENCES anggota(id),
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+    ],
+  },
 ];
 
 let siap = false;

@@ -7,6 +7,7 @@ import {
 } from './umum.js';
 import { csvAnggota, POLA_NIS } from './csv.js';
 import { apiRedaksi } from './redaksi.js';
+import { apiFoto } from './drive.js';
 import { apiEmail, paramGmail, simpanPengirim, prosesAntrean, jadwal } from './email.js';
 
 const KELOMPOK = { rubrik_berita: 'Rubrik berita', rubrik_majalah: 'Rubrik majalah' };
@@ -214,8 +215,8 @@ async function googleKembali(req, env) {
     if (!saya || !saya.peran.includes('admin')) return gagal('bukan_admin');
     if (!env.ENKRIPSI_KUNCI) return gagal('tanpa_kunci');
     const g = await simpanPengirim(env, email, data);
-    if (g) return gagal(g);
-    return alihkan('/#email/ok', { 'set-cookie': hapusState });
+    if (g && !g.startsWith('ok')) return gagal(g);
+    return alihkan(`/#email/${g || 'ok'}`, { 'set-cookie': hapusState });
   }
 
   const h = await selesaiMasuk(env, email, id.name);
@@ -481,6 +482,10 @@ async function api(req, env, url) {
   // Pengaturan email (Admin).
   const hasilEmail = await apiEmail(req, env, saya, p, m);
   if (hasilEmail) return hasilEmail;
+
+  // Foto upload ke Google Drive (A-55..A-60).
+  const hasilFoto = await apiFoto(req, env, saya, p, m);
+  if (hasilFoto) return hasilFoto;
 
   // Modul redaksi: tugas, naskah, antrean, edisi.
   const hasil = await apiRedaksi(req, env, saya, p, m);
