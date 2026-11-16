@@ -120,6 +120,7 @@ input:focus,select:focus,textarea:focus,.btn:focus-visible,nav a:focus-visible{o
 /* ===== Tambahan aplikasi ===== */
 dialog{border:1px solid var(--garis);border-radius:12px;background:var(--kartu);color:var(--teks);padding:20px;width:min(480px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog.lebar{width:min(760px,calc(100vw - 32px))}
 .cek{display:flex;gap:12px;flex-wrap:wrap}
 .cek label{display:inline-flex;gap:6px;align-items:center;margin:4px 0;color:var(--teks)}
 .galat{background:var(--bahaya-lembut);color:var(--bahaya);border-radius:8px;padding:8px 12px;margin:10px 0}

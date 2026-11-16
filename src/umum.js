@@ -79,3 +79,10 @@ export async function cekSandi(sandi, simpanan) {
   return beda === 0;
 }
 export const iterasiHash = simpanan => Number(String(simpanan || '').split('$')[1]) || 0;
+// Bandingkan teks tanpa membedakan huruf besar/kecil, waktu tetap (untuk password awal = NIS, A-54).
+export function samaTeks(a, b) {
+  const x = new TextEncoder().encode(String(a).toLowerCase()), y = new TextEncoder().encode(String(b).toLowerCase());
+  let beda = x.length ^ y.length;
+  for (let i = 0; i < x.length; i++) beda |= x[i] ^ (y[i % (y.length || 1)] || 0);
+  return beda === 0;
+}

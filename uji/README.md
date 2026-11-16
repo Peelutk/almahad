@@ -20,9 +20,11 @@ Jalankan: `bash uji/jalankan.sh`
 | `google.mjs` | Verifikasi login Google (id_token) |
 | `redaksi.mjs` | Tugas, naskah, antrean, edisi |
 | `nis.mjs` | Login NIS + password, wajib ganti, penguncian, reset Admin |
+| `csv.mjs` | Upload CSV anggota (pratinjau, duplikat, 500 baris) + password awal tanpa hash |
 | `email.mjs` | Notifikasi email, Cron, coba ulang, izin dicabut |
 | `migrasi.sh <commit>` | Buat DB berisi data dengan kode commit lama, lalu migrasikan dengan kode sekarang dan bandingkan |
 | `klik-nis.mjs` | Uji klik di Chrome: masuk NIS, wajib ganti password, Akun saya |
+| `klik-csv.mjs` | Uji klik di Chrome: Upload CSV (file ANSI), pratinjau, simpan, email otomatis di form |
 | `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail API (port 8791) |
 
 `/api/uji/masuk` hanya aktif bila `UJI_LOGIN=1` **dan** host `localhost` — tidak berlaku di Worker asli.

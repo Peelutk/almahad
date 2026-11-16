@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 12)
+# Al-Ma'had — Desain Sistem (Draf 13)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -64,6 +64,10 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-48 | **Lupa password** → Admin menekan *Reset password ke NIS* di halaman Anggota (wajib ganti lagi, kunci dibuka, semua sesi anggota itu diakhiri) | Sederhana, tanpa email | Admin harus dihubungi langsung |
 | A-49 | Password disimpan sebagai **PBKDF2-SHA256** dengan salt; iterasi diatur variabel `PBKDF2_ITERASI` (bawaan 10.000 karena batas CPU Worker gratis) dan otomatis ditingkatkan saat anggota masuk bila nilainya dinaikkan | Tidak ada password tersimpan dalam bentuk asli | 10.000 iterasi di bawah rekomendasi OWASP; naikkan bila memakai paket Workers berbayar |
 | A-50 | Anggota tanpa email menyimpan penanda internal `nis:<NIS>` di kolom email (migrasi 4 hanya menambah kolom, tanpa membangun ulang tabel anggota) | Migrasi aman: tabel induk tidak dibangun ulang, data & relasi tidak tersentuh | Penanda harus selalu disaring di kode (sudah: tampilan, Google, email) |
+| A-51 | **Upload CSV anggota** (Admin, halaman Anggota): kolom berurutan `NIS, Nama, Kelas`; pemisah koma atau titik koma (format Excel Indonesia); baris yang kolom NIS-nya bukan NIS (mis. baris judul) dilewati; tersedia *Unduh contoh CSV*; maksimal 500 baris per upload | Mendaftarkan banyak anggota sekaligus | Urutan kolom harus tepat (tidak dicocokkan dari judul kolom) |
+| A-52 | Alur upload: **pilih file → pilih peran → pratinjau → Simpan**. Peran (Reporter/Editor/Pemred, **tanpa Admin**) berlaku untuk semua baris. Pratinjau menandai tiap baris: akan ditambahkan / dilewati (NIS atau email sudah terdaftar, atau ganda di file) / salah (beserta alasan); belum ada yang tersimpan sebelum Simpan. **Duplikat dilewati**, data lama tidak diubah | Kesalahan terlihat sebelum tersimpan; CSV tidak bisa menimpa data atau membuat Admin | Satu file = satu peran; peran campuran diubah manual sesudahnya |
+| A-53 | **Email otomatis `(NIS)@daarululuumlido.com`**: di CSV selalu; di form manual terisi otomatis saat NIS diketik tetapi tetap bisa diubah atau dikosongkan | Anggota langsung bisa login Google & menerima notifikasi | Bila email sekolah santri tidak sama dengan NIS, harus dibetulkan manual (login NIS tetap jalan) |
+| A-54 | **Password awal tanpa hash**: anggota yang punya NIS tetapi belum punya hash password berarti *password awal = NIS* (dicocokkan langsung dengan NIS, tetap wajib ganti). Berlaku untuk tambah anggota, CSV, ubah NIS, dan reset. Hash PBKDF2 baru dibuat saat anggota mengganti password | Upload ratusan baris tidak melebihi batas CPU Worker gratis; tambah/reset lebih ringan | Satu cabang tambahan di kode login & ganti password (diuji khusus) |
 
 ## 3. Mindmap
 
@@ -72,6 +76,7 @@ mindmap
   root((Al-Ma'had))
     Anggota
       Data anggota
+      Upload CSV
       Peran ganda
       Periode & arsip
     Penugasan
@@ -160,7 +165,7 @@ flowchart TD
 
 | Tabel | Kolom utama |
 |-------|-------------|
-| `anggota` | id, email (unik, `@daarululuumlido.com`), nama, kelas, periode_id, status (`aktif`/`arsip`) |
+| `anggota` | id, email (unik, `@daarululuumlido.com`, atau penanda `nis:<NIS>`), nis (unik), nama, kelas, periode_id, status (`aktif`/`arsip`), sandi_hash (kosong + ada NIS = password awal NIS), sandi_wajib_ganti, gagal_masuk, terkunci_sampai |
 | `anggota_peran` | anggota_id, peran (`reporter`/`editor`/`pemred`/`admin`) — satu baris per peran |
 | `periode` | id, nama (mis. 2026/2027), mulai, selesai, aktif |
 | `pilihan` | id, kelompok (mis. `rubrik_berita`, `rubrik_majalah`), nilai, urutan, aktif — modul Daftar Pilihan (A-20) |
@@ -185,7 +190,7 @@ Prototipe statis: `prototipe/index.html` (data contoh, tombol belum berfungsi; l
 | Antrean Redaksi | Editor, Pemred | Perlu disunting; menunggu persetujuan akhir |
 | Edisi Majalah | Pemred | Daftar edisi; susun & urutkan naskah; kunci; halaman cetak |
 | Halaman cetak | Pemred | Tampilan seperti dokumen (kertas putih, per rubrik) → Cetak / Simpan PDF |
-| Anggota | Admin | Daftar per periode, peran ganda, status arsip |
+| Anggota | Admin | Daftar per periode, peran ganda, status arsip; Upload CSV (pratinjau → Simpan) |
 | Daftar Pilihan | Admin, Pemred | Tab rubrik berita/majalah; tambah, urutkan, nonaktifkan |
 
 ## 10. Pertanyaan terbuka

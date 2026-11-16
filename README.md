@@ -8,7 +8,7 @@ Sistem redaksi internal organisasi jurnalistik santri — Cloudflare Workers + D
 
 ## Status
 
-Semua modul tersedia: login Google & NIS + password, Anggota & peran, Periode, Daftar Pilihan, Tugas Liputan,
+Semua modul tersedia: login Google & NIS + password, Anggota & peran (termasuk Upload CSV), Periode, Daftar Pilihan, Tugas Liputan,
 Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah), Notifikasi Email (Gmail API + Cron).
 
 ## Struktur
@@ -17,6 +17,7 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
 |--------|-----|
 | `wrangler.jsonc` | Konfigurasi Worker `almahad`, binding D1 `DB`, variabel publik |
 | `src/worker.js` | API `/api/*`: login Google, sesi, anggota, periode, daftar pilihan |
+| `src/csv.js` | Upload CSV anggota (pratinjau & simpan) |
 | `src/redaksi.js` | API tugas, naskah, antrean, edisi, ringkasan dasbor |
 | `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
 | `src/email.js` | Notifikasi email: Gmail API, antrean, pengingat tenggat (Cron), pengaturan email |
@@ -36,7 +37,7 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
    - Secret `ENKRIPSI_KUNCI` = teks acak panjang (kunci enkripsi token Gmail). Jangan diganti setelah dipakai.
    - Google Cloud Console (proyek OAuth yang sama): aktifkan **Gmail API**; di *OAuth consent screen → Data access* tambahkan scope `.../auth/gmail.send`; status aplikasi **In production**.
    - Masuk sebagai Admin → **Pengaturan → Email** → *Hubungkan Gmail* dengan akun pengirim → *Kirim email uji* → *Aktifkan*.
-6. **Login NIS** (tanpa pengaturan tambahan): Admin mengisi NIS anggota → password awal = NIS → anggota wajib ganti saat pertama masuk. Opsional: variabel `PBKDF2_ITERASI` (bawaan 10000).
+6. **Login NIS** (tanpa pengaturan tambahan): Admin mengisi NIS anggota (satu per satu atau **Upload CSV** `NIS;Nama;Kelas`, email otomatis `NIS@daarululuumlido.com`) → password awal = NIS → anggota wajib ganti saat pertama masuk. Opsional: variabel `PBKDF2_ITERASI` (bawaan 10000).
 7. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
 
 ## Aturan keamanan

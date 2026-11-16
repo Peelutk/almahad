@@ -116,7 +116,8 @@ async function halAnggota() {
   anggotaCache = await api('/api/anggota');
   const daftar = anggotaCache.filter(a => tampilArsip || a.status === 'aktif');
   return `<div class="baris antara"><div><h1>Anggota</h1><p class="sub">Satu anggota boleh punya beberapa peran. Anggota periode lama diarsipkan.</p></div>
-    <button class="btn utama" onclick="formAnggota()">+ Tambah anggota</button></div>
+    <div class="baris"><button class="btn" onclick="formCsv()">Upload CSV</button>
+    <button class="btn utama" onclick="formAnggota()">+ Tambah anggota</button></div></div>
   <div class="kartu">
     <div class="cek" style="margin-bottom:6px"><label><input type="checkbox" ${tampilArsip ? 'checked' : ''} onchange="tampilArsip=this.checked;tampil()"> Tampilkan anggota arsip</label></div>
     ${daftar.length ? `<div class="tabel-wadah"><table><tr><th>Nama</th><th>NIS</th><th>Email</th><th>Kelas</th><th>Peran</th><th>Periode</th><th></th></tr>
@@ -135,7 +136,7 @@ function formAnggota(id) {
   d.innerHTML = `<form method="dialog" id="f-anggota">
     <h2 style="margin-top:0">${id ? 'Ubah anggota' : 'Tambah anggota'}</h2>
     <label>NIS ${id ? '' : '(password awal = NIS)'}</label><input type="text" name="nis" value="${esc(a.nis || '')}" maxlength="20" placeholder="mis. 216326">
-    <label>Email sekolah (opsional — untuk login Google & notifikasi)</label><input type="text" name="email" value="${esc(a.email || '')}" placeholder="nama@daarululuumlido.com">
+    <label>Email sekolah (otomatis dari NIS, boleh diubah/dikosongkan — untuk login Google & notifikasi)</label><input type="text" name="email" value="${esc(a.email || '')}" placeholder="nama@daarululuumlido.com">
     <label>Nama</label><input type="text" name="nama" value="${esc(a.nama)}" required maxlength="100">
     <label>Kelas</label><input type="text" name="kelas" value="${esc(a.kelas)}" maxlength="20">
     <label>Peran</label><div class="cek">${PERAN.map(p => `<label><input type="checkbox" name="peran" value="${p}" ${a.peran.includes(p) ? 'checked' : ''}> ${besar(p)}</label>`).join('')}</div>
@@ -147,6 +148,13 @@ function formAnggota(id) {
       <button class="btn" value="batal" formnovalidate>Batal</button></div>
   </form>`;
   d.showModal();
+  // Email otomatis (NIS)@domain sekolah selama kolom email kosong atau masih hasil otomatis (A-53).
+  const fa = $('#f-anggota');
+  let emailAuto = fa.email.value && fa.email.value === emailDariNis(fa.nis.value) ? fa.email.value : '';
+  fa.nis.oninput = () => {
+    if (fa.email.value && fa.email.value !== emailAuto) return;
+    emailAuto = emailDariNis(fa.nis.value); fa.email.value = emailAuto;
+  };
   $('#f-anggota').onsubmit = async e => {
     const v = e.submitter?.value;
     if (v === 'batal') return;
@@ -164,6 +172,76 @@ function formAnggota(id) {
       await api(id ? `/api/anggota/${id}` : '/api/anggota', id ? 'PUT' : 'POST', data);
       d.close(); toast('Tersimpan.'); tampil();
     } catch (err) { const g = $('#f-galat'); g.hidden = false; g.textContent = err.message; }
+  };
+}
+
+const emailDariNis = nis => (nis.trim() && saya.domain ? `${nis.trim().toLowerCase()}@${saya.domain}` : '');
+
+// ---------- upload CSV anggota (A-51..A-53) ----------
+const CONTOH_CSV = 'sep=;\r\nNIS;Nama;Kelas\r\n216001;Ahmad Fulan;XI-A\r\n216002;Muhammad Faiz;X-B\r\n';
+function unduhContohCsv() {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + CONTOH_CSV], { type: 'text/csv' }));
+  a.download = 'contoh-anggota.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+// Excel sering menyimpan CSV dalam ANSI (Windows-1252), bukan UTF-8.
+async function bacaFileTeks(file) {
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch { return new TextDecoder('windows-1252').decode(buf); }
+}
+function formCsv() {
+  const d = $('#dialog');
+  d.classList.add('lebar'); d.addEventListener('close', () => d.classList.remove('lebar'), { once: true });
+  let teks = '';
+  d.innerHTML = `<form method="dialog" id="f-csv">
+    <h2 style="margin-top:0">Upload CSV anggota</h2>
+    <p class="sub" style="margin-top:0">Kolom berurutan: <b>NIS, Nama, Kelas</b> (pemisah koma atau titik koma; baris judul boleh ada).
+      Email dibuat otomatis: NIS@${esc(saya.domain || '')}. Password awal = NIS. Data yang sudah terdaftar dilewati.
+      <a href="#" onclick="unduhContohCsv();return false">Unduh contoh CSV</a></p>
+    <label for="c-file">File CSV</label><input type="file" id="c-file" accept=".csv,text/csv">
+    <label for="c-peran">Peran untuk semua anggota di file ini</label>
+    <select id="c-peran">${['reporter', 'editor', 'pemred'].map(p => `<option value="${p}">${besar(p)}</option>`).join('')}</select>
+    <div id="c-hasil"></div>
+    <div class="galat" id="c-galat" hidden></div>
+    <div class="baris" style="margin-top:16px"><button class="btn utama" value="simpan" id="c-simpan" disabled>Simpan</button>
+      <button class="btn" value="batal" formnovalidate>Batal</button></div>
+  </form>`;
+  d.showModal();
+  const g = $('#c-galat'), hasil = $('#c-hasil'), simpan = $('#c-simpan');
+  const galat = m => { g.hidden = false; g.textContent = m; };
+  const pratinjau = async () => {
+    g.hidden = true; simpan.disabled = true; hasil.innerHTML = '';
+    if (!teks) return;
+    hasil.innerHTML = '<p class="sub">Memeriksa…</p>';
+    try {
+      const r = await api('/api/anggota/csv', 'POST', { teks, peran: $('#c-peran').value, simpan: false });
+      const LABEL = { baru: ['l-terbit', 'Ditambahkan'], dilewati: ['l-draf', 'Dilewati'], salah: ['l-ditolak', 'Salah'] };
+      hasil.innerHTML = `<p style="margin:14px 0 6px"><b>Pratinjau:</b> ${r.jumlah.baru} akan ditambahkan · ${r.jumlah.dilewati} dilewati · ${r.jumlah.salah} salah</p>
+        <div class="tabel-wadah" style="max-height:300px;overflow:auto"><table><tr><th>Baris</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Email</th><th>Status</th></tr>
+        ${r.baris.map(b => `<tr><td>${b.no}</td><td>${esc(b.nis)}</td><td>${esc(b.nama)}</td><td>${esc(b.kelas)}</td><td>${esc(b.email || '—')}</td>
+          <td><span class="lencana ${LABEL[b.status][0]}">${LABEL[b.status][1]}</span>${b.alasan ? `<div class="sub" style="font-size:12px">${esc(b.alasan)}</div>` : ''}</td></tr>`).join('')}
+        </table></div>`;
+      simpan.disabled = !r.jumlah.baru;
+      simpan.textContent = r.jumlah.baru ? `Simpan ${r.jumlah.baru} anggota` : 'Simpan';
+    } catch (err) { hasil.innerHTML = ''; galat(err.message); }
+  };
+  $('#c-file').onchange = async e => {
+    const f = e.target.files[0]; teks = '';
+    if (f && f.size > 300000) { galat('File CSV terlalu besar (maksimal ±300 KB).'); hasil.innerHTML = ''; simpan.disabled = true; return; }
+    if (f) teks = await bacaFileTeks(f);
+    pratinjau();
+  };
+  $('#c-peran').onchange = pratinjau;
+  $('#f-csv').onsubmit = async e => {
+    if (e.submitter?.value === 'batal') return;
+    e.preventDefault();
+    simpan.disabled = true;
+    try {
+      const r = await api('/api/anggota/csv', 'POST', { teks, peran: $('#c-peran').value, simpan: true });
+      d.close(); toast(`${r.disimpan} anggota ditambahkan${r.jumlah.dilewati + r.jumlah.salah ? `, ${r.jumlah.dilewati + r.jumlah.salah} baris dilewati` : ''}.`); tampil();
+    } catch (err) { galat(err.message); simpan.disabled = false; }
   };
 }
 
