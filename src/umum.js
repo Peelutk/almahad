@@ -55,3 +55,27 @@ export function wajib(saya, ...peran) {
   if (!saya) throw new Galat(401, 'Silakan masuk terlebih dahulu.');
   if (peran.length && !peran.some(p => saya.peran.includes(p))) throw new Galat(403, 'Anda tidak punya akses untuk ini.');
 }
+
+// ---------- password (PBKDF2-SHA256) ----------
+// Format simpanan: pbkdf2$<iterasi>$<salt base64>$<hash base64>. Iterasi disimpan agar bisa dinaikkan kelak.
+const b64 = u8 => btoa(String.fromCharCode(...u8));
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function turunkan(sandi, salt, iterasi) {
+  const kunci = await crypto.subtle.importKey('raw', new TextEncoder().encode(sandi), 'PBKDF2', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iterasi }, kunci, 256));
+}
+export const iterasiSandi = env => Math.max(1000, Number(env.PBKDF2_ITERASI) || 10000);
+export async function hashSandi(sandi, iterasi) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return `pbkdf2$${iterasi}$${b64(salt)}$${b64(await turunkan(sandi, salt, iterasi))}`;
+}
+export async function cekSandi(sandi, simpanan) {
+  const [jenis, it, salt, hash] = String(simpanan || '').split('$');
+  if (jenis !== 'pbkdf2' || !hash) return false;
+  const a = await turunkan(sandi, unb64(salt), Number(it)), b = unb64(hash);
+  if (a.length !== b.length) return false;
+  let beda = 0;
+  for (let i = 0; i < a.length; i++) beda |= a[i] ^ b[i];
+  return beda === 0;
+}
+export const iterasiHash = simpanan => Number(String(simpanan || '').split('$')[1]) || 0;

@@ -3,6 +3,7 @@
 import { pastikanSkema } from './skema.js';
 import {
   Galat, json, alihkan, bacaCookie, buatCookie, acak, sha256, dekodeJwt, bacaJson, teks, daftarPeran, wajib,
+  hashSandi, cekSandi, iterasiSandi, iterasiHash,
 } from './umum.js';
 import { apiRedaksi } from './redaksi.js';
 import { apiEmail, paramGmail, simpanPengirim, prosesAntrean, jadwal } from './email.js';
@@ -13,6 +14,25 @@ const COOKIE_SESI = 'am_sesi';
 const COOKIE_STATE = 'am_state';
 
 const domain = env => (env.GOOGLE_HD || '').toLowerCase();
+const KUNCI_GAGAL = 5;            // salah password berturut-turut → akun dikunci
+const LAMA_KUNCI = 15 * 60;       // detik
+const BATAS_IP = 20;              // salah password dari satu IP dalam 15 menit → IP ditahan
+const detikKini = () => Math.floor(Date.now() / 1000);
+
+// NIS: 3–20 karakter huruf/angka/titik/strip. Kosong → null.
+function cekNis(v) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  if (!s) return null;
+  if (!/^[0-9A-Za-z.-]{3,20}$/.test(s)) throw new Galat(400, 'NIS hanya boleh huruf/angka (3–20 karakter).');
+  return s;
+}
+// Anggota tanpa email menyimpan penanda internal "nis:<NIS>" di kolom email (lihat migrasi 4).
+const emailAsli = e => (e && !String(e).startsWith('nis:') ? e : null);
+const kolomEmail = (email, nis) => email || `nis:${nis}`;
+// Email boleh kosong (A-45); bila diisi harus email sekolah.
+function emailOpsional(env, v) {
+  return typeof v === 'string' && v.trim() ? emailSekolah(env, v) : null;
+}
 function emailSekolah(env, email) {
   const e = teks(email, 'Email', 200).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+$/.test(e) || !e.endsWith('@' + domain(env)))
@@ -24,11 +44,17 @@ function emailSekolah(env, email) {
 async function ambilSaya(req, env) {
   const token = bacaCookie(req, COOKIE_SESI);
   if (!token) return null;
-  const a = await env.DB.prepare(`SELECT a.id, a.email, a.nama, a.kelas, a.periode_id
+  const a = await env.DB.prepare(`SELECT a.id, a.email, a.nis, a.nama, a.kelas, a.periode_id, s.cara,
+      a.sandi_wajib_ganti, a.sandi_hash IS NOT NULL AS punya_sandi
     FROM sesi s JOIN anggota a ON a.id = s.anggota_id
     WHERE s.token_hash = ? AND s.kedaluwarsa > ? AND a.status = 'aktif'`)
-    .bind(await sha256(token), Math.floor(Date.now() / 1000)).first();
+    .bind(await sha256(token), detikKini()).first();
   if (!a) return null;
+  a.email = emailAsli(a.email);
+  // Masuk dengan NIS memakai password awal (= NIS) → wajib ganti dulu (A-46).
+  a.wajib_ganti_sandi = a.cara === 'nis' && a.sandi_wajib_ganti === 1;
+  a.punya_sandi = !!a.punya_sandi;
+  delete a.sandi_wajib_ganti;
   const { results } = await env.DB.prepare('SELECT peran FROM anggota_peran WHERE anggota_id = ?').bind(a.id).all();
   a.peran = results.map(r => r.peran);
   return a;
@@ -50,14 +76,80 @@ async function selesaiMasuk(env, email, namaGoogle) {
     a = { id: r.id, status: 'aktif' };
   }
   if (a.status !== 'aktif') return { galat: 'arsip' };
+  return { token: await buatSesi(env, a.id, 'google') };
+}
+
+async function buatSesi(env, anggotaId, cara) {
   const token = acak();
-  const kini = Math.floor(Date.now() / 1000);
+  const kini = detikKini();
   await env.DB.batch([
     env.DB.prepare('DELETE FROM sesi WHERE kedaluwarsa <= ?').bind(kini),
-    env.DB.prepare('INSERT INTO sesi (token_hash, anggota_id, kedaluwarsa) VALUES (?, ?, ?)')
-      .bind(await sha256(token), a.id, kini + UMUR_SESI),
+    env.DB.prepare('INSERT INTO sesi (token_hash, anggota_id, kedaluwarsa, cara) VALUES (?, ?, ?, ?)')
+      .bind(await sha256(token), anggotaId, kini + UMUR_SESI, cara),
   ]);
-  return { token };
+  return token;
+}
+
+// ---------- masuk dengan NIS + password ----------
+let hashPalsu = null; // dipakai saat NIS tidak dikenal agar waktu jawab sama (tidak membocorkan NIS terdaftar)
+async function masukNis(req, env) {
+  const b = await bacaJson(req);
+  const nis = typeof b.nis === 'string' ? b.nis.trim() : '';
+  const sandi = typeof b.sandi === 'string' ? b.sandi : '';
+  if (!nis || !sandi) throw new Galat(400, 'Isi NIS dan password.');
+  if (sandi.length > 200) throw new Galat(400, 'NIS atau password salah.');
+  const kini = detikKini();
+  const ip = req.headers.get('cf-connecting-ip') || 'lokal';
+  const dariIp = await env.DB.prepare('SELECT count(*) AS n FROM masuk_gagal WHERE ip = ? AND waktu > ?').bind(ip, kini - LAMA_KUNCI).first();
+  if (dariIp.n >= BATAS_IP) throw new Galat(429, 'Terlalu banyak percobaan dari perangkat ini. Coba lagi dalam 15 menit.');
+  const a = await env.DB.prepare('SELECT id, status, sandi_hash, gagal_masuk, terkunci_sampai FROM anggota WHERE nis = ? COLLATE NOCASE').bind(nis).first();
+  if (a && a.terkunci_sampai > kini)
+    throw new Galat(429, `Akun dikunci karena terlalu banyak salah password. Coba lagi dalam ${Math.ceil((a.terkunci_sampai - kini) / 60)} menit.`);
+  if (!hashPalsu) hashPalsu = await hashSandi(acak(), iterasiSandi(env));
+  const cocok = await cekSandi(sandi, a && a.sandi_hash ? a.sandi_hash : hashPalsu);
+  if (!a || !a.sandi_hash || !cocok) {
+    const q = [
+      env.DB.prepare('INSERT INTO masuk_gagal (ip, waktu) VALUES (?, ?)').bind(ip, kini),
+      env.DB.prepare('DELETE FROM masuk_gagal WHERE waktu <= ?').bind(kini - LAMA_KUNCI),
+    ];
+    if (a) {
+      const n = a.gagal_masuk + 1;
+      q.push(n >= KUNCI_GAGAL
+        ? env.DB.prepare('UPDATE anggota SET gagal_masuk = 0, terkunci_sampai = ? WHERE id = ?').bind(kini + LAMA_KUNCI, a.id)
+        : env.DB.prepare('UPDATE anggota SET gagal_masuk = ? WHERE id = ?').bind(n, a.id));
+    }
+    await env.DB.batch(q);
+    throw new Galat(400, 'NIS atau password salah.');
+  }
+  if (a.status !== 'aktif') throw new Galat(403, 'Akun Anda sudah diarsipkan (periode lama). Hubungi Admin.');
+  const q = [env.DB.prepare('UPDATE anggota SET gagal_masuk = 0, terkunci_sampai = NULL WHERE id = ?').bind(a.id)];
+  // Naikkan kekuatan hash bila pengaturan iterasi bertambah.
+  if (iterasiHash(a.sandi_hash) < iterasiSandi(env))
+    q.push(env.DB.prepare('UPDATE anggota SET sandi_hash = ? WHERE id = ?').bind(await hashSandi(sandi, iterasiSandi(env)), a.id));
+  await env.DB.batch(q);
+  const token = await buatSesi(env, a.id, 'nis');
+  return json({ ok: true }, 200, { 'set-cookie': buatCookie(COOKIE_SESI, token, UMUR_SESI) });
+}
+
+// Ganti password sendiri. Sesi lain milik anggota ini diakhiri.
+async function gantiSandi(req, env, saya) {
+  const b = await bacaJson(req);
+  const a = await env.DB.prepare('SELECT nis, sandi_hash FROM anggota WHERE id = ?').bind(saya.id).first();
+  if (!a.nis) throw new Galat(400, 'Akun Anda belum punya NIS. Minta Admin mengisi NIS terlebih dahulu.');
+  const lama = typeof b.lama === 'string' ? b.lama : '';
+  const baru = typeof b.baru === 'string' ? b.baru : '';
+  if (a.sandi_hash && !(await cekSandi(lama, a.sandi_hash))) throw new Galat(400, 'Password lama salah.');
+  if (baru.length < 8) throw new Galat(400, 'Password baru minimal 8 karakter.');
+  if (baru.length > 100) throw new Galat(400, 'Password baru maksimal 100 karakter.');
+  if (baru.toLowerCase() === a.nis.toLowerCase()) throw new Galat(400, 'Password baru tidak boleh sama dengan NIS.');
+  if (baru === lama) throw new Galat(400, 'Password baru harus berbeda dari password lama.');
+  const token = bacaCookie(req, COOKIE_SESI);
+  await env.DB.batch([
+    env.DB.prepare('UPDATE anggota SET sandi_hash = ?, sandi_wajib_ganti = 0, gagal_masuk = 0, terkunci_sampai = NULL WHERE id = ?')
+      .bind(await hashSandi(baru, iterasiSandi(env)), saya.id),
+    env.DB.prepare('DELETE FROM sesi WHERE anggota_id = ? AND token_hash <> ?').bind(saya.id, await sha256(token || '')),
+  ]);
+  return json({ ok: true });
 }
 
 // ---------- Google OAuth ----------
@@ -131,11 +223,12 @@ async function googleKembali(req, env) {
 
 // ---------- anggota ----------
 async function daftarAnggota(env) {
-  const { results } = await env.DB.prepare(`SELECT a.id, a.email, a.nama, a.kelas, a.status, a.periode_id,
+  const { results } = await env.DB.prepare(`SELECT a.id, a.email, a.nis, a.nama, a.kelas, a.status, a.periode_id,
+      a.sandi_wajib_ganti AS sandi_awal, a.terkunci_sampai > ${detikKini()} AS terkunci,
       p.nama AS periode, (SELECT group_concat(peran) FROM anggota_peran WHERE anggota_id = a.id) AS peran
     FROM anggota a LEFT JOIN periode p ON p.id = a.periode_id
     ORDER BY a.status, a.nama COLLATE NOCASE`).all();
-  return results.map(r => ({ ...r, peran: r.peran ? r.peran.split(',') : [] }));
+  return results.map(r => ({ ...r, email: emailAsli(r.email), terkunci: !!r.terkunci, sandi_awal: r.sandi_awal === 1, peran: r.peran ? r.peran.split(',') : [] }));
 }
 
 async function jumlahAdminAktif(env, kecualiId) {
@@ -147,15 +240,21 @@ async function jumlahAdminAktif(env, kecualiId) {
 
 async function tambahAnggota(req, env) {
   const b = await bacaJson(req);
-  const email = emailSekolah(env, b.email);
+  const email = emailOpsional(env, b.email);
+  const nis = cekNis(b.nis);
+  if (!email && !nis) throw new Galat(400, 'Isi minimal NIS atau email sekolah.');
   const nama = teks(b.nama, 'Nama', 100);
   const kelas = teks(b.kelas, 'Kelas', 20, false);
   const peran = daftarPeran(b.peran);
-  if (await env.DB.prepare('SELECT 1 FROM anggota WHERE email = ?').bind(email).first())
+  if (email && await env.DB.prepare('SELECT 1 FROM anggota WHERE email = ?').bind(email).first())
     throw new Galat(409, 'Email ini sudah terdaftar.');
+  if (nis && await env.DB.prepare('SELECT 1 FROM anggota WHERE nis = ? COLLATE NOCASE').bind(nis).first())
+    throw new Galat(409, 'NIS ini sudah terdaftar.');
   const periode = await env.DB.prepare('SELECT id FROM periode WHERE aktif = 1').first();
-  const r = await env.DB.prepare('INSERT INTO anggota (email, nama, kelas, periode_id) VALUES (?, ?, ?, ?) RETURNING id')
-    .bind(email, nama, kelas, periode ? periode.id : null).first();
+  // Password awal = NIS, wajib diganti saat pertama masuk dengan NIS (A-46).
+  const r = await env.DB.prepare(`INSERT INTO anggota (email, nis, nama, kelas, periode_id, sandi_hash, sandi_wajib_ganti)
+    VALUES (?, ?, ?, ?, ?, ?, 1) RETURNING id`)
+    .bind(kolomEmail(email, nis), nis, nama, kelas, periode ? periode.id : null, nis ? await hashSandi(nis, iterasiSandi(env)) : null).first();
   await env.DB.batch(peran.map(p => env.DB.prepare('INSERT INTO anggota_peran (anggota_id, peran) VALUES (?, ?)').bind(r.id, p)));
   return json({ id: r.id }, 201);
 }
@@ -168,6 +267,17 @@ async function ubahAnggota(req, env, id) {
   const kelas = b.kelas === undefined ? lama.kelas : teks(b.kelas, 'Kelas', 20, false);
   const status = b.status === undefined ? lama.status : b.status;
   if (!['aktif', 'arsip'].includes(status)) throw new Galat(400, 'Status tidak valid.');
+  const emailLama = emailAsli(lama.email);
+  const email = b.email === undefined ? emailLama : emailOpsional(env, b.email);
+  const nis = b.nis === undefined ? lama.nis : cekNis(b.nis);
+  if (!email && !nis) throw new Galat(400, 'Isi minimal NIS atau email sekolah.');
+  if (email && email !== (emailLama || '').toLowerCase() && await env.DB.prepare('SELECT 1 FROM anggota WHERE email = ? AND id <> ?').bind(email, id).first())
+    throw new Galat(409, 'Email ini sudah terdaftar.');
+  if (nis && await env.DB.prepare('SELECT 1 FROM anggota WHERE nis = ? COLLATE NOCASE AND id <> ?').bind(nis, id).first())
+    throw new Galat(409, 'NIS ini sudah terdaftar.');
+  // NIS berubah dan password masih password awal → password awal ikut NIS baru.
+  let sandiHash = lama.sandi_hash;
+  if (nis && nis !== lama.nis && (lama.sandi_wajib_ganti === 1 || !lama.sandi_hash)) sandiHash = await hashSandi(nis, iterasiSandi(env));
   const peran = b.peran === undefined ? null : daftarPeran(b.peran);
 
   // Pengaman: harus selalu ada minimal satu Admin aktif.
@@ -181,13 +291,26 @@ async function ubahAnggota(req, env, id) {
     const p = await env.DB.prepare('SELECT id FROM periode WHERE aktif = 1').first();
     periodeId = p ? p.id : null; // diaktifkan kembali → masuk periode aktif
   }
-  const q = [env.DB.prepare('UPDATE anggota SET nama = ?, kelas = ?, status = ?, periode_id = ? WHERE id = ?')
-    .bind(nama, kelas, status, periodeId, id)];
+  const q = [env.DB.prepare('UPDATE anggota SET nama = ?, kelas = ?, status = ?, periode_id = ?, email = ?, nis = ?, sandi_hash = ? WHERE id = ?')
+    .bind(nama, kelas, status, periodeId, kolomEmail(email, nis), nis, sandiHash, id)];
   if (peran) {
     q.push(env.DB.prepare('DELETE FROM anggota_peran WHERE anggota_id = ?').bind(id));
     for (const p of peran) q.push(env.DB.prepare('INSERT INTO anggota_peran (anggota_id, peran) VALUES (?, ?)').bind(id, p));
   }
   await env.DB.batch(q);
+  return json({ ok: true });
+}
+
+// Admin mereset password anggota ke NIS-nya (wajib ganti lagi), membuka kunci, dan mengakhiri semua sesinya.
+async function resetSandi(env, id) {
+  const a = await env.DB.prepare('SELECT nis FROM anggota WHERE id = ?').bind(id).first();
+  if (!a) throw new Galat(404, 'Anggota tidak ditemukan.');
+  if (!a.nis) throw new Galat(400, 'Anggota ini belum punya NIS. Isi NIS terlebih dahulu.');
+  await env.DB.batch([
+    env.DB.prepare('UPDATE anggota SET sandi_hash = ?, sandi_wajib_ganti = 1, gagal_masuk = 0, terkunci_sampai = NULL WHERE id = ?')
+      .bind(await hashSandi(a.nis, iterasiSandi(env)), id),
+    env.DB.prepare('DELETE FROM sesi WHERE anggota_id = ?').bind(id),
+  ]);
   return json({ ok: true });
 }
 
@@ -302,7 +425,14 @@ async function api(req, env, url) {
   // Pengaman CSRF: semua perubahan wajib membawa header khusus (tidak bisa dikirim situs lain tanpa izin CORS).
   if (m !== 'GET' && req.headers.get('x-almahad') !== '1') throw new Galat(403, 'Permintaan ditolak.');
 
+  if (p === '/api/masuk' && m === 'POST') return masukNis(req, env);
+
   const saya = await ambilSaya(req, env);
+
+  // Wajib ganti password awal: semua API lain ditolak sampai password diganti (A-46).
+  if (saya && saya.wajib_ganti_sandi && !['/api/saya', '/api/sandi', '/api/keluar'].includes(p))
+    throw new Galat(403, 'Ganti password awal Anda terlebih dahulu.');
+  if (p === '/api/sandi' && m === 'POST') { wajib(saya); return gantiSandi(req, env, saya); }
 
   if (p === '/api/keluar' && m === 'POST') {
     const token = bacaCookie(req, COOKIE_SESI);
@@ -322,6 +452,8 @@ async function api(req, env, url) {
   }
   let r = p.match(/^\/api\/anggota\/(\d+)$/);
   if (r && m === 'PUT') { wajib(saya, 'admin'); return ubahAnggota(req, env, Number(r[1])); }
+  r = p.match(/^\/api\/anggota\/(\d+)\/reset-sandi$/);
+  if (r && m === 'POST') { wajib(saya, 'admin'); return resetSandi(env, Number(r[1])); }
 
   if (p === '/api/periode') {
     wajib(saya, 'admin');

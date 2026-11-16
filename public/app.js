@@ -40,9 +40,73 @@ function halMasuk() {
     <h1>Al-Ma'had</h1>
     <p class="sub">Sistem redaksi organisasi jurnalistik</p>
     ${kode ? `<div class="galat">${esc(PESAN_MASUK[kode] || 'Gagal masuk.')}</div>` : ''}
-    <a class="btn utama g-btn" href="/api/google/mulai">Masuk dengan Google</a>
-    <p class="sub" style="margin-top:12px;font-size:13px">Hanya email sekolah yang terdaftar sebagai anggota.</p>
+    <form id="f-masuk" onsubmit="masukNis(event)" style="text-align:left">
+      <label for="m-nis">NIS</label><input type="text" id="m-nis" name="nis" autocomplete="username" inputmode="text" required maxlength="20">
+      <label for="m-sandi">Password</label><input type="password" id="m-sandi" name="sandi" autocomplete="current-password" required maxlength="200">
+      <div class="galat" id="m-galat" hidden></div>
+      <button class="btn utama g-btn" id="m-tombol">Masuk</button>
+    </form>
+    <p class="sub" style="margin:10px 0 0;font-size:13px">Password awal = NIS. Lupa password? Hubungi Admin.</p>
+    <div class="pemisah"><span>atau</span></div>
+    <a class="btn g-btn" style="margin-top:0" href="/api/google/mulai">Masuk dengan Google</a>
+    <p class="sub" style="margin-top:8px;font-size:13px">Google: khusus email sekolah yang terdaftar.</p>
   </div></div>`;
+}
+async function masukNis(e) {
+  e.preventDefault();
+  const f = e.target, g = $('#m-galat'), t = $('#m-tombol');
+  t.disabled = true; g.hidden = true;
+  try {
+    await api('/api/masuk', 'POST', { nis: f.nis.value, sandi: f.sandi.value });
+    saya = null; history.replaceState(null, '', '/'); tampil();
+  } catch (err) { g.hidden = false; g.textContent = err.message; t.disabled = false; f.sandi.value = ''; f.sandi.focus(); }
+}
+
+// ---------- ganti password (wajib saat masuk pertama dengan NIS, atau dari Akun saya) ----------
+function formSandi(wajib) {
+  return `<form id="f-sandi" onsubmit="gantiSandi(event, ${wajib})">
+    ${saya.punya_sandi ? `<label for="s-lama">Password lama${wajib ? ' (password awal = NIS Anda)' : ''}</label>
+      <input type="password" id="s-lama" name="lama" autocomplete="current-password" required maxlength="200">` : ''}
+    <label for="s-baru">Password baru (minimal 8 karakter, tidak sama dengan NIS)</label>
+    <input type="password" id="s-baru" name="baru" autocomplete="new-password" required minlength="8" maxlength="100">
+    <label for="s-ulang">Ulangi password baru</label>
+    <input type="password" id="s-ulang" name="ulang" autocomplete="new-password" required minlength="8" maxlength="100">
+    <div class="galat" id="s-galat" hidden></div>
+    <div class="baris" style="margin-top:14px"><button class="btn utama">Simpan password</button>
+      ${wajib ? '<button class="btn" type="button" onclick="keluar()">Keluar</button>' : ''}</div>
+  </form>`;
+}
+async function gantiSandi(e, wajib) {
+  e.preventDefault();
+  const f = e.target, g = $('#s-galat');
+  g.hidden = true;
+  if (f.baru.value !== f.ulang.value) { g.hidden = false; g.textContent = 'Ulangan password baru tidak sama.'; return; }
+  try {
+    await api('/api/sandi', 'POST', { lama: f.lama ? f.lama.value : '', baru: f.baru.value });
+    toast('Password berhasil diganti.');
+    saya = null; if (wajib) location.hash = 'dasbor'; tampil();
+  } catch (err) { g.hidden = false; g.textContent = err.message; }
+}
+function halGantiWajib() {
+  return `<div class="masuk"><div class="kartu" style="max-width:420px;text-align:left">
+    <div class="logo" aria-hidden="true" style="margin:0 auto 12px">M</div>
+    <h1 style="text-align:center">Ganti password awal</h1>
+    <p class="sub" style="text-align:center">Assalamu'alaikum, ${esc(saya.nama)}. Demi keamanan, ganti password awal (NIS) Anda sebelum melanjutkan.</p>
+    ${formSandi(true)}
+  </div></div>`;
+}
+async function halAkun() {
+  return `<h1>Akun saya</h1><p class="sub">Data akun diatur oleh Admin. Di sini Anda bisa mengganti password.</p>
+  <div class="kartu"><table>
+    <tr><th style="width:140px">Nama</th><td>${esc(saya.nama)}</td></tr>
+    <tr><th>NIS</th><td>${esc(saya.nis || '—')}</td></tr>
+    <tr><th>Email</th><td>${esc(saya.email || '—')}</td></tr>
+    <tr><th>Kelas</th><td>${esc(saya.kelas || '—')}</td></tr>
+    <tr><th>Peran</th><td>${saya.peran.map(p => `<span class="lencana l-peran">${besar(p)}</span>`).join(' ')}</td></tr>
+  </table></div>
+  <div class="kartu"><b>Ganti password</b>
+    ${saya.nis ? formSandi(false) : '<p class="sub">Akun Anda belum punya NIS, jadi belum bisa masuk dengan NIS + password. Minta Admin mengisi NIS.</p>'}
+  </div>`;
 }
 
 // ---------- anggota ----------
@@ -55,9 +119,10 @@ async function halAnggota() {
     <button class="btn utama" onclick="formAnggota()">+ Tambah anggota</button></div>
   <div class="kartu">
     <div class="cek" style="margin-bottom:6px"><label><input type="checkbox" ${tampilArsip ? 'checked' : ''} onchange="tampilArsip=this.checked;tampil()"> Tampilkan anggota arsip</label></div>
-    ${daftar.length ? `<div class="tabel-wadah"><table><tr><th>Nama</th><th>Email</th><th>Kelas</th><th>Peran</th><th>Periode</th><th></th></tr>
+    ${daftar.length ? `<div class="tabel-wadah"><table><tr><th>Nama</th><th>NIS</th><th>Email</th><th>Kelas</th><th>Peran</th><th>Periode</th><th></th></tr>
     ${daftar.map(a => `<tr style="${a.status === 'arsip' ? 'opacity:.6' : ''}"><td><b>${esc(a.nama)}</b>${a.status === 'arsip' ? ' <span class="lencana l-draf">Arsip</span>' : ''}</td>
-      <td>${esc(a.email)}</td><td>${esc(a.kelas)}</td>
+      <td>${esc(a.nis || '—')}${a.terkunci ? ' <span class="lencana l-ditolak" title="Terlalu banyak salah password">Terkunci</span>' : ''}</td>
+      <td>${esc(a.email || '—')}</td><td>${esc(a.kelas)}</td>
       <td>${a.peran.map(p => `<span class="lencana l-peran">${besar(p)}</span>`).join(' ')}</td>
       <td>${esc(a.periode || '—')}</td>
       <td><button class="btn kecil" onclick="formAnggota(${a.id})">Ubah</button></td></tr>`).join('')}
@@ -65,25 +130,36 @@ async function halAnggota() {
   </div>`;
 }
 function formAnggota(id) {
-  const a = id ? anggotaCache.find(x => x.id === id) : { email: '', nama: '', kelas: '', peran: ['reporter'], status: 'aktif' };
+  const a = id ? anggotaCache.find(x => x.id === id) : { email: '', nis: '', nama: '', kelas: '', peran: ['reporter'], status: 'aktif' };
   const d = $('#dialog');
   d.innerHTML = `<form method="dialog" id="f-anggota">
     <h2 style="margin-top:0">${id ? 'Ubah anggota' : 'Tambah anggota'}</h2>
-    <label>Email sekolah</label><input type="text" name="email" value="${esc(a.email)}" ${id ? 'disabled' : 'required'} placeholder="nama@daarululuumlido.com">
+    <label>NIS ${id ? '' : '(password awal = NIS)'}</label><input type="text" name="nis" value="${esc(a.nis || '')}" maxlength="20" placeholder="mis. 216326">
+    <label>Email sekolah (opsional — untuk login Google & notifikasi)</label><input type="text" name="email" value="${esc(a.email || '')}" placeholder="nama@daarululuumlido.com">
     <label>Nama</label><input type="text" name="nama" value="${esc(a.nama)}" required maxlength="100">
     <label>Kelas</label><input type="text" name="kelas" value="${esc(a.kelas)}" maxlength="20">
     <label>Peran</label><div class="cek">${PERAN.map(p => `<label><input type="checkbox" name="peran" value="${p}" ${a.peran.includes(p) ? 'checked' : ''}> ${besar(p)}</label>`).join('')}</div>
     ${id ? `<label>Status</label><select name="status"><option value="aktif" ${a.status === 'aktif' ? 'selected' : ''}>Aktif</option><option value="arsip" ${a.status === 'arsip' ? 'selected' : ''}>Arsip</option></select>` : ''}
+    ${id && a.nis ? `<p class="sub" style="margin:10px 0 0;font-size:13px">Password: ${a.sandi_awal ? 'masih password awal (NIS)' : 'sudah diganti anggota'}${a.terkunci ? ' · <b>terkunci</b>' : ''}</p>` : ''}
     <div class="galat" id="f-galat" hidden></div>
-    <div class="baris" style="margin-top:16px"><button class="btn utama" value="simpan">Simpan</button><button class="btn" value="batal" formnovalidate>Batal</button></div>
+    <div class="baris" style="margin-top:16px"><button class="btn utama" value="simpan">Simpan</button>
+      ${id && a.nis ? '<button class="btn" value="reset" formnovalidate>Reset password ke NIS</button>' : ''}
+      <button class="btn" value="batal" formnovalidate>Batal</button></div>
   </form>`;
   d.showModal();
   $('#f-anggota').onsubmit = async e => {
-    if (e.submitter?.value !== 'simpan') return;
+    const v = e.submitter?.value;
+    if (v === 'batal') return;
     e.preventDefault();
+    if (v === 'reset') {
+      if (!confirm(`Reset password ${a.nama} ke NIS-nya? Anggota wajib mengganti saat masuk berikutnya, dan semua sesinya diakhiri.`)) return;
+      try { await api(`/api/anggota/${id}/reset-sandi`, 'POST'); d.close(); toast('Password direset ke NIS.'); tampil(); }
+      catch (err) { const g = $('#f-galat'); g.hidden = false; g.textContent = err.message; }
+      return;
+    }
     const f = new FormData(e.target);
-    const data = { nama: f.get('nama'), kelas: f.get('kelas'), peran: f.getAll('peran') };
-    if (id) data.status = f.get('status'); else data.email = f.get('email');
+    const data = { nama: f.get('nama'), kelas: f.get('kelas'), peran: f.getAll('peran'), nis: f.get('nis'), email: f.get('email') };
+    if (id) data.status = f.get('status');
     try {
       await api(id ? `/api/anggota/${id}` : '/api/anggota', id ? 'PUT' : 'POST', data);
       d.close(); toast('Tersimpan.'); tampil();
@@ -253,6 +329,7 @@ const MENU = [
   ['periode', 'Periode', () => punya('admin'), halPeriode],
   ['pilihan', 'Daftar Pilihan', () => punya('admin', 'pemred'), halPilihan],
   ['email', 'Email', () => punya('admin'), halEmail],
+  ['akun', 'Akun saya', () => true, halAkun, false],
 ];
 let setelahTampil = null; // dipanggil setelah halaman dimasukkan ke DOM
 
@@ -266,6 +343,7 @@ async function tampil() {
     try { saya = await api('/api/saya'); } catch { saya = null; }
   }
   if (!saya) { $('#app').innerHTML = halMasuk(); return; }
+  if (saya.wajib_ganti_sandi) { $('#app').innerHTML = halGantiWajib(); return; }
   if (location.search) history.replaceState(null, '', '/' + location.hash);
 
   const [rute, ...args] = (location.hash.slice(1) || 'dasbor').split('/');
@@ -275,7 +353,7 @@ async function tampil() {
   <header class="atas">
     <button class="menu-btn" onclick="$('nav').classList.toggle('buka')" aria-label="Menu">☰</button>
     <div class="logo" aria-hidden="true">M</div><b>Al-Ma'had</b><span class="sela"></span>
-    <div class="siapa">${esc(saya.nama)}<br>${saya.peran.map(besar).join(', ')}</div>
+    <a class="siapa" href="#akun" title="Akun saya">${esc(saya.nama)}<br>${saya.peran.map(besar).join(', ')}</a>
     <button class="btn kecil" onclick="keluar()">Keluar</button>
   </header>
   <div class="tata">

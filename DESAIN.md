@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 11)
+# Al-Ma'had — Desain Sistem (Draf 12)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -58,6 +58,12 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-42 | Kejadian yang dikirimi email: tugas baru/ganti reporter → reporter; naskah diajukan → semua Editor; lolos editor → semua Pemred; revisi/ditolak/terbit → penulis; pelaku tidak menerima email atas aksinya sendiri | Setiap orang tahu saat gilirannya bertindak | Editor/Pemred bisa menerima banyak email bila naskah ramai |
 | A-43 | **Pengingat tenggat** H-1 dan saat terlambat, masing-masing sekali per tugas (diulang bila tenggat diubah), mulai 06.00 WIB, lewat Cron tiap 15 menit | Reporter diingatkan tanpa kerja manual | — |
 | A-44 | Email masuk **antrean**: dikirim langsung, yang gagal dicoba ulang maksimal 5 kali lalu bisa dikirim ulang manual; notifikasi **nonaktif secara bawaan** dan tidak mengantrekan apa pun saat nonaktif/terputus | Aksi utama tidak pernah gagal karena email; tidak ada banjir email saat diaktifkan | Kejadian selama nonaktif tidak akan pernah dikirimi email |
+| A-45 | **Login NIS + password** untuk semua anggota; login Google tetap ada. Setiap anggota punya NIS dan/atau email sekolah — **email jadi opsional** | Anggota tanpa email sekolah tetap bisa masuk | Anggota tanpa email tidak bisa login Google dan tidak menerima notifikasi email |
+| A-46 | **Password awal = NIS**, wajib diganti saat pertama masuk dengan NIS (semua fitur terkunci sampai diganti); password baru minimal 8 karakter dan tidak sama dengan NIS; mengganti password mengakhiri sesi lain | Praktis, tidak perlu menyampaikan password | Siapa pun yang tahu NIS bisa masuk duluan sebelum pemiliknya mengganti — sampaikan ke anggota agar segera masuk |
+| A-47 | **Pengaman**: 5× salah password → akun dikunci 15 menit; 20× gagal dari satu perangkat dalam 15 menit → perangkat ditahan; pesan galat tidak membedakan NIS salah atau password salah | Menahan tebak-tebakan password | Pemilik akun ikut menunggu bila ada yang iseng mencoba |
+| A-48 | **Lupa password** → Admin menekan *Reset password ke NIS* di halaman Anggota (wajib ganti lagi, kunci dibuka, semua sesi anggota itu diakhiri) | Sederhana, tanpa email | Admin harus dihubungi langsung |
+| A-49 | Password disimpan sebagai **PBKDF2-SHA256** dengan salt; iterasi diatur variabel `PBKDF2_ITERASI` (bawaan 10.000 karena batas CPU Worker gratis) dan otomatis ditingkatkan saat anggota masuk bila nilainya dinaikkan | Tidak ada password tersimpan dalam bentuk asli | 10.000 iterasi di bawah rekomendasi OWASP; naikkan bila memakai paket Workers berbayar |
+| A-50 | Anggota tanpa email menyimpan penanda internal `nis:<NIS>` di kolom email (migrasi 4 hanya menambah kolom, tanpa membangun ulang tabel anggota) | Migrasi aman: tabel induk tidak dibangun ulang, data & relasi tidak tersentuh | Penanda harus selalu disaring di kode (sudah: tampilan, Google, email) |
 
 ## 3. Mindmap
 

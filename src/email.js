@@ -136,7 +136,8 @@ export async function emailAktif(env) {
 }
 async function antrekan(env, daftar) {
   const unik = new Map();
-  for (const d of daftar) if (d.ke && !unik.has(d.ke.toLowerCase())) unik.set(d.ke.toLowerCase(), d);
+  // Anggota tanpa email (penanda "nis:…") dilewati.
+  for (const d of daftar) if (d.ke && d.ke.includes('@') && !unik.has(d.ke.toLowerCase())) unik.set(d.ke.toLowerCase(), d);
   if (!unik.size) return 0;
   await env.DB.batch([...unik.values()].map(d =>
     env.DB.prepare('INSERT INTO email_antrean (ke, subjek, html) VALUES (?, ?, ?)').bind(d.ke, d.subjek, d.html)));
@@ -171,7 +172,7 @@ export async function prosesAntrean(env, maks = 20) {
 // ---------- penerima ----------
 async function emailPeran(env, peran, kecualiId) {
   const { results } = await env.DB.prepare(`SELECT DISTINCT a.email FROM anggota a JOIN anggota_peran p ON p.anggota_id = a.id
-    WHERE a.status = 'aktif' AND p.peran = ? AND a.id <> ?`).bind(peran, kecualiId || 0).all();
+    WHERE a.status = 'aktif' AND a.email LIKE '%@%' AND p.peran = ? AND a.id <> ?`).bind(peran, kecualiId || 0).all();
   return results.map(r => r.email);
 }
 
@@ -216,7 +217,7 @@ export async function notifNaskah(env, naskahId, aksi, oleh, catatan) {
 export async function pengingatTenggat(env) {
   if (!(await emailAktif(env)) || jamWib() < 6) return 0;
   const sql = `SELECT t.id, t.judul, t.tenggat, rp.email FROM tugas t JOIN anggota rp ON rp.id = t.reporter_id
-    WHERE t.status IN ('baru','dikerjakan') AND rp.status = 'aktif' AND `;
+    WHERE t.status IN ('baru','dikerjakan') AND rp.status = 'aktif' AND rp.email LIKE '%@%' AND `;
   const besok = (await env.DB.prepare(sql + 't.tenggat = ? AND t.ingat_h1_at IS NULL').bind(hariIni(1)).all()).results;
   const telat = (await env.DB.prepare(sql + 't.tenggat < ? AND t.ingat_telat_at IS NULL').bind(hariIni()).all()).results;
   const q = [];
@@ -266,6 +267,7 @@ export async function apiEmail(req, env, saya, p, m) {
   }
   if (p === '/api/email/uji' && m === 'POST') {
     if ((await ambilAtur(env, 'gmail_status')) !== 'terhubung') throw new Galat(400, 'Hubungkan akun Gmail pengirim terlebih dahulu.');
+    if (!saya.email) throw new Galat(400, 'Akun Anda tidak punya email.');
     try {
       await kirimGmail(env, saya.email, "Email uji Al-Ma'had", templat(env, 'Email uji berhasil',
         `<p>Assalamu'alaikum ${escHtml(saya.nama)}, notifikasi email Al-Ma'had sudah bisa mengirim email.</p>`, '', "Buka Al-Ma'had"));

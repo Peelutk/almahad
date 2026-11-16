@@ -1,0 +1,45 @@
+// Uji klik tampilan login NIS lewat Chrome DevTools Protocol. Butuh server di B dengan anggota NIS 5555 (password awal 5555).
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+const B = process.env.B || 'http://localhost:8799';
+const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const PROFIL = path.resolve(fs.mkdtempSync('.wrangler/chrome-'));
+const proses = spawn(CHROME, ['--headless=new', '--disable-gpu', '--remote-debugging-port=9556', `--user-data-dir=${PROFIL}`, '--window-size=1100,800', 'about:blank']);
+let lulus = 0, gagal = 0;
+const cek = (n, ok, i = '') => { ok ? lulus++ : gagal++; console.log(`${ok ? 'OK  ' : 'GAGAL'} ${n}${ok ? '' : ' :: ' + i}`); };
+const tidur = ms => new Promise(r => setTimeout(r, ms));
+let daftar;
+for (let i = 0; i < 60; i++) { try { daftar = await (await fetch('http://127.0.0.1:9556/json')).json(); if (daftar.some(t => t.type === 'page')) break; } catch {} await tidur(500); }
+const ws = new WebSocket(daftar.find(t => t.type === 'page').webSocketDebuggerUrl);
+await new Promise(r => ws.onopen = r);
+let nomor = 0; const tunggu = new Map();
+ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.id && tunggu.has(m.id)) { tunggu.get(m.id)(m); tunggu.delete(m.id); } };
+const kirim = (method, params = {}) => new Promise(r => { const id = ++nomor; tunggu.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
+const js = async e => (await kirim('Runtime.evaluate', { expression: e, awaitPromise: true, returnByValue: true })).result?.result?.value;
+const sampai = async (e, ms = 5000) => { for (let t = 0; t < ms; t += 200) { if (await js(e)) return true; await tidur(200); } return false; };
+const foto = async nama => { const r = await kirim('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`.wrangler/${nama}.png`, Buffer.from(r.result.data, 'base64')); };
+await kirim('Page.enable'); await kirim('Runtime.enable');
+
+await kirim('Page.navigate', { url: B + '/' });
+cek('halaman masuk: form NIS + tombol Google', await sampai(`!!document.querySelector('#f-masuk') && document.body.textContent.includes('Masuk dengan Google')`));
+await foto('klik-masuk');
+await js(`(() => { const f = document.querySelector('#f-masuk'); f.nis.value = '5555'; f.sandi.value = 'salah'; f.requestSubmit(); })()`);
+cek('password salah → pesan galat', await sampai(`!document.querySelector('#m-galat').hidden && document.querySelector('#m-galat').textContent.includes('salah')`));
+await js(`(() => { const f = document.querySelector('#f-masuk'); f.nis.value = '5555'; f.sandi.value = '5555'; f.requestSubmit(); })()`);
+cek('password awal → layar wajib ganti (tanpa menu)', await sampai(`!!document.querySelector('#f-sandi') && !document.querySelector('nav')`));
+await foto('klik-wajib-ganti');
+await js(`(() => { const f = document.querySelector('#f-sandi'); f.lama.value = '5555'; f.baru.value = 'sandi-baru-123'; f.ulang.value = 'beda-123456'; f.requestSubmit(); })()`);
+cek('ulangan tidak sama → galat', await sampai(`document.querySelector('#s-galat').textContent.includes('tidak sama')`));
+await js(`(() => { const f = document.querySelector('#f-sandi'); f.ulang.value = 'sandi-baru-123'; f.requestSubmit(); })()`);
+cek('ganti berhasil → dasbor', await sampai(`!!document.querySelector('nav') && document.querySelector('h1')?.textContent.includes('Assalamu')`));
+await js(`location.hash = 'akun'`);
+cek('halaman Akun saya: NIS & form ganti password', await sampai(`document.querySelector('#isi')?.textContent.includes('5555') && !!document.querySelector('#f-sandi')`));
+await foto('klik-akun');
+await js(`keluar()`);
+cek('keluar → halaman masuk', await sampai(`!!document.querySelector('#f-masuk')`));
+await js(`(() => { const f = document.querySelector('#f-masuk'); f.nis.value = '5555'; f.sandi.value = 'sandi-baru-123'; f.requestSubmit(); })()`);
+cek('masuk dengan password baru → langsung dasbor', await sampai(`!!document.querySelector('nav')`));
+ws.close(); proses.kill();
+console.log(`\nLulus ${lulus}, gagal ${gagal}`);
+process.exit(gagal ? 1 : 0);

@@ -140,6 +140,28 @@ export const MIGRASI = [
       `ALTER TABLE tugas ADD COLUMN ingat_telat_at TEXT`,
     ],
   },
+  {
+    // Email menjadi opsional TANPA membangun ulang tabel anggota (membangun ulang tabel induk di D1
+    // memicu CASCADE/pelanggaran FK). Anggota tanpa email menyimpan penanda internal "nis:<NIS>"
+    // di kolom email; penanda ini tidak pernah ditampilkan, dikirimi email, atau dipakai login Google.
+    versi: 4,
+    nama: 'Login NIS + password: kolom NIS & password, cara masuk sesi, percobaan masuk',
+    sql: [
+      `ALTER TABLE anggota ADD COLUMN nis TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS anggota_nis ON anggota(nis COLLATE NOCASE)`,
+      `ALTER TABLE anggota ADD COLUMN sandi_hash TEXT`,
+      `ALTER TABLE anggota ADD COLUMN sandi_wajib_ganti INTEGER NOT NULL DEFAULT 1`,
+      `ALTER TABLE anggota ADD COLUMN gagal_masuk INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE anggota ADD COLUMN terkunci_sampai INTEGER`,
+      `ALTER TABLE sesi ADD COLUMN cara TEXT NOT NULL DEFAULT 'google'`,
+      `CREATE TABLE IF NOT EXISTS masuk_gagal (
+        id INTEGER PRIMARY KEY,
+        ip TEXT NOT NULL,
+        waktu INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS masuk_gagal_ip ON masuk_gagal(ip, waktu)`,
+    ],
+  },
 ];
 
 let siap = false;

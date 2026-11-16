@@ -79,7 +79,7 @@ th{font-size:13px;color:var(--teks-2);font-weight:600}
 .l-telat{background:var(--bahaya-lembut);color:var(--bahaya)}
 .l-peran{background:var(--utama-lembut);color:var(--utama)}
 label{display:block;font-size:13px;color:var(--teks-2);margin:10px 0 4px}
-input[type=text],input[type=date],input[type=url],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--garis);border-radius:8px;background:var(--kartu)}
+input[type=text],input[type=password],input[type=date],input[type=url],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--garis);border-radius:8px;background:var(--kartu)}
 textarea{min-height:220px;resize:vertical}
 input:focus,select:focus,textarea:focus,.btn:focus-visible,nav a:focus-visible{outline:2px solid var(--merek);outline-offset:1px}
 .dua{display:grid;grid-template-columns:2fr 1fr;gap:14px}
@@ -145,3 +145,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .kertas .foto-gagal{color:#555}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:disabled:hover{border-color:var(--garis)}
+.pemisah{display:flex;align-items:center;gap:10px;color:var(--teks-2);font-size:13px;margin:18px 0 12px}
+.pemisah::before,.pemisah::after{content:"";flex:1;border-top:1px solid var(--garis)}
+a.siapa{text-decoration:none}
+a.siapa:hover{color:var(--utama)}

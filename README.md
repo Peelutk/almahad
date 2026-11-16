@@ -8,7 +8,7 @@ Sistem redaksi internal organisasi jurnalistik santri — Cloudflare Workers + D
 
 ## Status
 
-Semua modul tersedia: login Google, Anggota & peran, Periode, Daftar Pilihan, Tugas Liputan,
+Semua modul tersedia: login Google & NIS + password, Anggota & peran, Periode, Daftar Pilihan, Tugas Liputan,
 Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah), Notifikasi Email (Gmail API + Cron).
 
 ## Struktur
@@ -21,6 +21,7 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
 | `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
 | `src/email.js` | Notifikasi email: Gmail API, antrean, pengingat tenggat (Cron), pengaturan email |
 | `src/skema.js` | Migrasi database — berjalan otomatis pada permintaan pertama |
+| `uji/` | Uji otomatis (API, migrasi, klik browser) — lihat `uji/README.md`; tidak ikut ter-deploy |
 | `public/` | Tampilan aplikasi (HTML/CSS/JS tanpa build); `redaksi.js` = halaman modul redaksi |
 
 ## Penyiapan (sekali)
@@ -35,11 +36,13 @@ Naskah (tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (e
    - Secret `ENKRIPSI_KUNCI` = teks acak panjang (kunci enkripsi token Gmail). Jangan diganti setelah dipakai.
    - Google Cloud Console (proyek OAuth yang sama): aktifkan **Gmail API**; di *OAuth consent screen → Data access* tambahkan scope `.../auth/gmail.send`; status aplikasi **In production**.
    - Masuk sebagai Admin → **Pengaturan → Email** → *Hubungkan Gmail* dengan akun pengirim → *Kirim email uji* → *Aktifkan*.
-6. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
+6. **Login NIS** (tanpa pengaturan tambahan): Admin mengisi NIS anggota → password awal = NIS → anggota wajib ganti saat pertama masuk. Opsional: variabel `PBKDF2_ITERASI` (bawaan 10000).
+7. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
 
 ## Aturan keamanan
 
-- Hanya email `@daarululuumlido.com` yang bisa masuk, dan hanya bila terdaftar sebagai anggota aktif.
+- Masuk dengan Google (hanya email `@daarululuumlido.com`) atau NIS + password; keduanya hanya untuk anggota aktif.
+- Password: PBKDF2 + salt; 5× salah → akun dikunci 15 menit; 20× gagal per perangkat / 15 menit → ditahan.
 - Sesi disimpan sebagai hash di D1, cookie `HttpOnly; Secure; SameSite=Lax`, berlaku 30 hari; anggota yang diarsipkan langsung keluar.
 - Setiap perubahan data wajib membawa header `x-almahad: 1` (pengaman CSRF).
 - Harus selalu ada minimal satu Admin aktif.
