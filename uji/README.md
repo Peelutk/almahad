@@ -13,6 +13,7 @@ DRIVE_API_URL=http://127.0.0.1:8791
 GEMINI_API_URL=http://127.0.0.1:8791
 DOCS_API_URL=http://127.0.0.1:8791
 GEMINI_API_KEY=kunci-gemini-uji
+GOOGLE_PICKER_KEY=kunci-picker-uji
 ENKRIPSI_KUNCI=kunci-uji-lokal
 ```
 
@@ -32,6 +33,8 @@ Jalankan: `bash uji/jalankan.sh`
 | `foto.mjs` | Upload foto ke Drive (tiruan): izin, folder, file 20 MB, tampil pratinjau/asli, akses |
 | `klik-foto.mjs` | Uji klik di Chrome: upload foto (progres, tolak bukan foto / > 20 MB), keterangan, simpan, cetak, halaman Google |
 | `transkrip.mjs` | Transkrip foto: Gemini (tiruan) — kirim foto, baca, batas, kuota; dokumen tujuan & kirim ke Google Docs (tiruan); riwayat |
+| `arsip.mjs` | Folder arsip edisi: folder induk (Picker), folder edisi/rubrik/penulis, transkrip ke folder, satu dokumen per naskah |
+| `klik-arsip.mjs` | Uji klik: kartu folder arsip, edisi baru → tautan folder, Simpan ke folder edisi dari form naskah (Picker asli tidak diuji) |
 | `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail + Drive + Docs + Gemini (port 8791) |
 
 `/api/uji/masuk` hanya aktif bila `UJI_LOGIN=1` **dan** host `localhost` — tidak berlaku di Worker asli.

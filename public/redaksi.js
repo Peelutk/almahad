@@ -380,7 +380,7 @@ function formEdisi(e) {
     try {
       const data = { nomor: f.nomor.value, tema: f.tema.value, bulan_terbit: f.bulan_terbit.value };
       const r = await api(e.id ? `/api/edisi/${e.id}` : '/api/edisi', e.id ? 'PUT' : 'POST', data);
-      d.close(); toast('Tersimpan.');
+      d.close(); toast(r.folder_galat ? `Edisi tersimpan, tetapi folder Drive belum dibuat: ${r.folder_galat}` : 'Tersimpan.');
       if (e.id) tampil(); else location.hash = `edisi/${r.id}`;
     } catch (err) { const g = $('#f-galat'); g.hidden = false; g.textContent = err.message; }
   };
@@ -396,7 +396,10 @@ async function halEdisiDetail(id) {
       ${susun ? `<button class="btn" onclick="statusEdisi('dikunci')">Kunci edisi</button>` : ''}
       ${e.status === 'dikunci' ? `<button class="btn" onclick="statusEdisi('disusun')">Buka kunci</button><button class="btn utama" onclick="statusEdisi('terbit')">Tandai Terbit</button>` : ''}
       <a class="btn ${e.status === 'disusun' ? '' : 'utama'}" href="#cetak/${e.id}">🖨 Halaman cetak</a></div></div>
-  <p class="sub">${esc(e.bulan_terbit || '—')} · ${lencanaEdisi(e.status)}</p>
+  <p class="sub">${esc(e.bulan_terbit || '—')} · ${lencanaEdisi(e.status)}
+    ${e.folder.tautan ? ` · <a href="${esc(e.folder.tautan)}" target="_blank" rel="noopener noreferrer">📁 Buka folder di Drive ↗</a>`
+      : e.folder.siap ? ' · <button class="btn kecil" onclick="buatFolderEdisi()">📁 Buat folder di Drive</button>'
+      : ' · <span title="Admin perlu memilih folder arsip di Pengaturan → Google">Folder Drive belum diatur</span>'}</p>
   <div class="kartu"><b>Isi edisi (urutan)</b>
     ${e.naskah.length ? `<div class="tabel-wadah"><table>${e.naskah.map((n, i) => `<tr><td style="width:30px">${i + 1}</td>
       <td><a href="#naskah/${n.id}"><b>${esc(n.judul)}</b></a><br><small style="color:var(--teks-2)">${esc(n.rubrik)} · ${esc(n.penulis)}</small></td>
@@ -409,6 +412,10 @@ async function halEdisiDetail(id) {
     ${e.calon.length ? `<div class="tabel-wadah"><table>${e.calon.map(n => `<tr><td><a href="#naskah/${n.id}">${esc(n.judul)}</a><br><small style="color:var(--teks-2)">${esc(n.rubrik)} · ${esc(n.penulis)}</small></td>
       <td style="text-align:right"><button class="btn kecil" onclick="masukkanNaskah(${n.id})">+ Masukkan</button></td></tr>`).join('')}</table></div>`
       : '<div class="kosong">Tidak ada naskah majalah terbit yang belum masuk edisi.</div>'}</div>` : ''}`;
+}
+async function buatFolderEdisi() {
+  try { await api(`/api/arsip/edisi/${edisiKini.id}`, 'POST'); toast('Folder edisi dibuat di Google Drive.'); tampil(); }
+  catch (err) { toast(err.message); }
 }
 const statusEdisi = s => {
   if (s === 'terbit' && !confirm('Tandai edisi ini Terbit? Setelah terbit, edisi tidak bisa diubah lagi.')) return;
@@ -470,9 +477,26 @@ function htmlTranskrip(data, keNaskah) {
       </div>
       <div class="baris" style="margin-top:12px"><button class="btn utama t-kirim" type="button" ${data.docs.length ? '' : 'disabled'}>Kirim ke Google Docs</button>
         ${keNaskah ? '<button class="btn t-naskah" type="button">Salin ke isi naskah</button>' : ''}</div>
+      ${htmlArsipTranskrip(data.arsip)}
     </div>
     <div class="galat t-galat" hidden></div>
     <div class="t-ok"></div>
+  </div>`;
+}
+// Simpan ke folder edisi (A-69): edisi + rubrik majalah + nama penulis → <edisi>/<rubrik>/<n. Penulis>/<Judul>.
+function htmlArsipTranskrip(a) {
+  if (!a || !a.aktif) return '';
+  if (!a.edisi.length) return '<p class="sub" style="margin-top:14px;font-size:13px">Simpan ke folder edisi: belum ada edisi yang sedang disusun.</p>';
+  return `<div class="t-arsip" style="margin-top:16px;border-top:1px solid var(--garis);padding-top:12px">
+    <b>Simpan ke folder edisi (Google Drive)</b>
+    <div class="grid" style="margin:0">
+      <div><label>Edisi</label><select class="a-edisi">${a.edisi.map(e => `<option value="${e.id}">${esc(e.nomor)}${e.tema ? ' — ' + esc(e.tema) : ''}</option>`).join('')}</select></div>
+      <div><label>Rubrik majalah</label><select class="a-rubrik"><option value="">— pilih rubrik —</option>${a.rubrik.map(r => `<option value="${r.id}">${esc(r.nilai)}</option>`).join('')}</select></div>
+      <div><label>Nama penulis</label><input type="text" class="a-penulis" maxlength="100"></div>
+      <div><label>Judul naskah (nama dokumen)</label><input type="text" class="a-judul" maxlength="150"></div>
+    </div>
+    <div class="baris" style="margin-top:12px"><button class="btn utama a-simpan" type="button">Simpan ke folder edisi</button></div>
+    <div class="a-ok"></div>
   </div>`;
 }
 // Dikecilkan di browser (sisi terpanjang 3000 px, JPEG) sebelum dikirim (A-65).
@@ -541,6 +565,31 @@ function pasangTranskrip(w, keNaskah) {
     } catch (e) { galat(e.message); }
     t.disabled = false;
   };
+  if (q('.t-arsip')) {
+    // Isi otomatis dari naskah yang sedang dibuka.
+    const f = keNaskah ? $('#f-naskah') : null, n = keNaskah ? naskahKini : null;
+    q('.a-penulis').value = (n && !n.baru && n.penulis) || saya.nama;
+    if (f) {
+      q('.a-judul').value = f.judul.value;
+      if (f.jenis.value === 'majalah' && [...q('.a-rubrik').options].some(o => o.value === f.rubrik_id.value)) q('.a-rubrik').value = f.rubrik_id.value;
+    }
+    q('.a-simpan').onclick = async () => {
+      galat(''); q('.a-ok').innerHTML = '';
+      const data = { edisi_id: Number(q('.a-edisi').value), rubrik_id: Number(q('.a-rubrik').value), penulis: q('.a-penulis').value,
+        judul: q('.a-judul').value || q('.t-judul').value, teks: q('.t-teks').value };
+      if (n && !n.baru) data.naskah_id = n.id;
+      if (!data.rubrik_id) return galat('Pilih rubrik majalah.');
+      if (!data.judul.trim()) return galat('Isi judul naskah (nama dokumen).');
+      const t = q('.a-simpan'); t.disabled = true;
+      try {
+        const r = await api('/api/arsip/transkrip', 'POST', data);
+        q('.a-ok').innerHTML = `<div class="kartu" style="border-color:var(--utama);margin-top:12px">${r.baru ? 'Dokumen dibuat' : 'Ditambahkan ke dokumen naskah ini'} di folder edisi.
+          <a href="${esc(r.tautan)}" target="_blank" rel="noopener noreferrer">Buka dokumen ↗</a>${r.folder ? ` · <a href="${esc(r.folder)}" target="_blank" rel="noopener noreferrer">Buka folder ↗</a>` : ''}</div>`;
+        toast('Tersimpan di folder edisi.');
+      } catch (e) { galat(e.message); }
+      t.disabled = false;
+    };
+  }
   if (keNaskah) q('.t-naskah').onclick = () => {
     const f = $('#f-naskah');
     const teks = q('.t-teks').value.trim();
@@ -551,7 +600,7 @@ function pasangTranskrip(w, keNaskah) {
 }
 async function dialogTranskrip() {
   let data;
-  try { data = await api('/api/transkrip'); } catch (e) { return toast(e.message); }
+  try { data = await api('/api/transkrip'); data.arsip = await api('/api/arsip/pilihan').catch(() => null); } catch (e) { return toast(e.message); }
   const d = $('#dialog');
   d.classList.add('lebar'); d.addEventListener('close', () => d.classList.remove('lebar'), { once: true });
   d.innerHTML = `<div id="w-transkrip"><div class="baris antara"><h2 style="margin:0">Transkrip foto</h2>
@@ -561,13 +610,14 @@ async function dialogTranskrip() {
 }
 async function halTranskrip() {
   const data = await api('/api/transkrip');
+  data.arsip = await api('/api/arsip/pilihan').catch(() => null);
   const wkt = s => new Date(s * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   setelahTampil = () => pasangTranskrip($('#w-transkrip'), false);
   return `<h1>Transkrip Foto</h1><p class="sub">Ubah foto tulisan menjadi teks, periksa, lalu kirim ke Google Docs.</p>
   <div class="kartu" id="w-transkrip">${htmlTranskrip(data, false)}</div>
   <div class="kartu"><b>Riwayat transkrip${punya('admin', 'pemred') ? '' : ' saya'}</b>
     ${data.riwayat.length ? `<div class="tabel-wadah"><table><tr><th>Waktu</th><th>Jenis</th><th>Dokumen</th><th>Judul</th><th>Foto</th><th>Karakter</th><th>Oleh</th></tr>
-    ${data.riwayat.map(r => `<tr><td style="white-space:nowrap">${wkt(r.waktu)}</td><td>${r.jenis === 'kirim' ? 'Kirim ke Docs' : 'Baca foto'}</td>
+    ${data.riwayat.map(r => `<tr><td style="white-space:nowrap">${wkt(r.waktu)}</td><td>${{ kirim: 'Kirim ke Docs', arsip: 'Folder edisi' }[r.jenis] || 'Baca foto'}</td>
       <td>${esc(r.dokumen || '—')}</td><td>${esc(r.judul || '—')}</td><td>${r.jumlah_foto || '—'}</td><td>${r.panjang}</td><td>${esc(r.oleh || '—')}</td></tr>`).join('')}
     </table></div>` : '<div class="kosong">Belum ada.</div>'}</div>`;
 }

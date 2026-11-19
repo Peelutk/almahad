@@ -353,6 +353,7 @@ const STATUS_EMAIL = { menunggu: ['Menunggu', 'l-diajukan'], dikirim: ['Dikirim'
 async function halEmail(args) {
   const e = await api('/api/email');
   const docs = e.drive ? await api('/api/docs-tujuan') : [];
+  const ar = await api('/api/arsip');
   const pesan = PESAN_EMAIL[args[0]];
   const tanggal = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   const st = { belum: 'Belum dihubungkan', terhubung: 'Terhubung', putus: 'Terputus — hubungkan ulang' }[e.status] || e.status;
@@ -372,6 +373,14 @@ async function halEmail(args) {
     <span class="${e.drive ? '' : 'sub'}">${e.drive ? 'Aktif — foto naskah disimpan di folder <i>Al-Ma&#39;had – Foto</i>' + (e.drive_folder ? ` (<a href="https://drive.google.com/drive/folders/${esc(e.drive_folder)}" target="_blank" rel="noopener noreferrer">buka folder ↗</a>)` : '') + '.'
       : e.status === 'terhubung' ? 'Belum aktif — izin Google Drive belum diberikan. Tekan <b>Hubungkan ulang</b> dan centang izin Drive.' : 'Belum aktif — hubungkan akun Google terlebih dahulu.'}</span>
     <p class="sub" style="margin:8px 0 0;font-size:13px">Foto hanya bisa dilihat anggota lewat aplikasi (file di Drive tetap privat). Menghapus foto dari naskah tidak menghapus file di Drive.</p>
+  </div>
+  <div class="kartu"><b>Folder arsip edisi (Google Drive)</b><br>
+    <span class="${ar.akar ? '' : 'sub'}">${ar.akar ? `Folder induk: <a href="${esc(ar.akar.tautan)}" target="_blank" rel="noopener noreferrer">${esc(ar.akar.nama || ar.akar.id)} ↗</a>` : 'Belum dipilih.'}</span>
+    <p class="sub" style="margin:8px 0;font-size:13px">Saat edisi baru dibuat, aplikasi membuat folder <i>EDISI KE …-(TEMA)</i> berisi folder per rubrik majalah di dalam folder ini.
+      Transkrip naskah disimpan ke <i>rubrik / nomor. nama penulis</i>. Pilih folder dengan masuk sebagai akun Google yang terhubung${ar.akun ? ` (<b>${esc(ar.akun)}</b>)` : ''}.</p>
+    ${!ar.drive ? '<div class="sub">Hubungkan akun Google dengan izin Drive terlebih dahulu.</div>'
+      : !ar.picker_key ? '<div class="galat">Variabel <code>GOOGLE_PICKER_KEY</code> belum dipasang di Worker — tombol pilih folder belum bisa dipakai.</div>'
+      : `<button class="btn ${ar.akar ? '' : 'utama'}" onclick="pilihFolderArsip()">${ar.akar ? 'Ganti folder arsip' : 'Pilih folder arsip edisi'}</button>`}
   </div>
   <div class="kartu"><b>Transkrip foto → Google Docs</b><br>
     <span class="${e.gemini ? '' : 'sub'}">${e.gemini ? 'Pembaca foto (Gemini) aktif.' : 'Pembaca foto belum aktif — pasang secret <code>GEMINI_API_KEY</code> di Worker.'}</span>
@@ -402,6 +411,33 @@ async function halEmail(args) {
       <td><span class="lencana ${(STATUS_EMAIL[x.status] || ['', 'l-draf'])[1]}">${(STATUS_EMAIL[x.status] || [x.status])[0]}</span></td></tr>`).join('')}</table></div>`
       : '<div class="kosong">Belum ada email.</div>'}
   </div>`;
+}
+// Google Drive Picker (A-67): masuk sebagai akun yang terhubung → pilih folder → aplikasi diberi akses ke folder itu saja.
+const muatSkrip = src => new Promise((ok, gagal) => {
+  if (document.querySelector(`script[src="${src}"]`)) return ok();
+  const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => gagal(new Error('Gagal memuat ' + src)); document.head.append(s);
+});
+async function pilihFolderArsip() {
+  try {
+    const ar = await api('/api/arsip');
+    await Promise.all([muatSkrip('https://accounts.google.com/gsi/client'), muatSkrip('https://apis.google.com/js/api.js')]);
+    await new Promise(ok => gapi.load('picker', ok));
+    const token = await new Promise((ok, gagal) => google.accounts.oauth2.initTokenClient({
+      client_id: ar.client_id, scope: 'https://www.googleapis.com/auth/drive.file', hint: ar.akun || undefined,
+      callback: r => r.error ? gagal(new Error('Izin Google dibatalkan.')) : ok(r.access_token),
+      error_callback: () => gagal(new Error('Jendela masuk Google ditutup.')),
+    }).requestAccessToken({ prompt: '' }));
+    // Folder arsip biasanya milik orang lain (dibagikan) → tampilan "Dibagikan" dulu, lalu "Drive Saya".
+    const tampilan = milikSaya => new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+      .setIncludeFolders(true).setSelectFolderEnabled(true).setMimeTypes('application/vnd.google-apps.folder').setOwnedByMe(milikSaya);
+    const pilihan = await new Promise(ok => new google.picker.PickerBuilder()
+      .addView(tampilan(false)).addView(tampilan(true))
+      .setOAuthToken(token).setDeveloperKey(ar.picker_key).setAppId(ar.app_id).setTitle('Pilih folder arsip edisi (mis. EDISI AL MAHAD)')
+      .setCallback(d => { if (d.action === 'picked') ok(d.docs[0]); else if (d.action === 'cancel') ok(null); }).build().setVisible(true));
+    if (!pilihan) return;
+    const r = await api('/api/arsip/akar', 'POST', { id: pilihan.id });
+    toast(`Folder arsip: ${r.nama}`); tampil();
+  } catch (err) { toast(err.message); }
 }
 function buatDocTujuan(e) {
   e.preventDefault();

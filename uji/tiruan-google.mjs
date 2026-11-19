@@ -6,7 +6,7 @@ const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 let kotak = [], gagal = false;
 // Drive tiruan
 // Docs & Gemini tiruan
-let nomorDoc = 0, dokumen = {}, docsGagal = false;
+let nomorFolder = 0, nomorDoc = 0, dokumen = {}, docsGagal = false;
 let nomorG = 0, gUnggah = [], gBerkas = {}, gDihapus = [], gemini = { gagal: 0, kosong: false, terakhir: null };
 let nomorFile = 0, folder = [], file = [], sesi = [], driveGagal = false, tanpaThumb = false, ukuranThumb = [];
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -56,13 +56,15 @@ http.createServer((req, res) => {
     if (u.pathname === '/drive/v3/files' && req.method === 'POST') {
       if (!berhak()) return kirim(401, { error: 'unauth' });
       const m = JSON.parse(body);
+      // Induk harus folder yang bisa diakses aplikasi (buatan aplikasi atau dipilih lewat Picker).
+      if ((m.parents || []).some(pid => !folder.some(f => f.id === pid))) return kirim(404, { error: 'induk tidak ada / tidak boleh' });
       if (m.mimeType === 'application/vnd.google-apps.document') {
         const id = 'doc' + (++nomorDoc) + 'XXXXXXXXXX';
         dokumen[id] = { name: m.name, parents: m.parents || [], teks: '\n', gaya: [], token: req.headers.authorization };
         return kirim(200, { id });
       }
       if (m.mimeType !== 'application/vnd.google-apps.folder') return kirim(400, { error: 'bukan folder' });
-      const id = 'folder' + (folder.length + 1) + 'XXXXXXXX';
+      const id = 'folder' + (++nomorFolder) + 'XXXXXXXX';
       folder.push({ id, name: m.name, parents: m.parents || [], token: req.headers.authorization });
       return kirim(200, { id });
     }
@@ -78,9 +80,21 @@ http.createServer((req, res) => {
     r = u.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
     if (r && req.method === 'PATCH') {
       if (!berhak()) return kirim(401, {});
-      const d = dokumen[decodeURIComponent(r[1])];
+      const id = decodeURIComponent(r[1]);
+      const d = dokumen[id] || folder.find(f => f.id === id);
       if (!d) return kirim(404, { error: 'notFound' });
-      d.name = JSON.parse(body).name; return kirim(200, { id: r[1] });
+      d.name = JSON.parse(body).name; return kirim(200, { id });
+    }
+    // ---- Drive: metadata folder (GET) — berkas biasa ditangani di bawah
+    r = u.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
+    if (r && req.method === 'GET' && folder.some(f => f.id === decodeURIComponent(r[1]))) {
+      if (!berhak()) return kirim(401, {});
+      const f = folder.find(x => x.id === decodeURIComponent(r[1]));
+      return kirim(200, { id: f.id, name: f.name, mimeType: 'application/vnd.google-apps.folder' });
+    }
+    if (r && req.method === 'GET' && dokumen[decodeURIComponent(r[1])]) {
+      if (!berhak()) return kirim(401, {});
+      return kirim(200, { id: r[1], name: dokumen[decodeURIComponent(r[1])].name, mimeType: 'application/vnd.google-apps.document' });
     }
     // ---- Docs API
     r = u.pathname.match(/^\/v1\/documents\/([^/:]+)(:batchUpdate)?$/);
@@ -175,6 +189,13 @@ http.createServer((req, res) => {
     r = u.pathname.match(/^\/docs\/hapus\/(.+)$/);
     if (r) { delete dokumen[r[1]]; return kirim(200, {}); }
     if (u.pathname === '/docs/mode') { docsGagal = u.searchParams.get('gagal') === '1'; return kirim(200, {}); }
+    // Simulasi folder milik orang lain yang dipilih Admin lewat Picker (aplikasi jadi boleh memakainya).
+    if (u.pathname === '/drive/folder-luar') {
+      const id = 'luar' + (++nomorFolder) + 'XXXXXXXXXX';
+      folder.push({ id, name: u.searchParams.get('nama') || 'Luar', parents: [], luar: true });
+      return kirim(200, { id });
+    }
+    if (u.pathname === '/drive/hapus-folder') { const id = u.searchParams.get('id'); folder = folder.filter(f => f.id !== id); return kirim(200, {}); }
     if (u.pathname === '/drive/keadaan') return kirim(200, { folder, file: file.map(({ data, ...f }) => ({ ...f, ukuran: data.length })), ukuranThumb });
     r = u.pathname.match(/^\/drive\/hapus\/(.+)$/);
     if (r) { file = file.filter(f => f.id !== r[1]); return kirim(200, {}); }

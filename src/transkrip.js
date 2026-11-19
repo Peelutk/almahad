@@ -10,14 +10,14 @@ const REDAKSI = ['reporter', 'editor', 'pemred'];
 const MAKS_FOTO = 5;
 const MAKS_UKURAN = 10 * 1024 * 1024;  // per foto setelah dikecilkan browser
 const JENIS = ['image/jpeg', 'image/png', 'image/webp'];
-const MAKS_TEKS = 50_000;
+export const MAKS_TEKS = 50_000;
 const BATAS_BACA = 30;                  // per anggota per jam (A-64)
 const TANPA_TEKS = 'TIDAK_ADA_TEKS';
 const apiGemini = env => env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com';
 const apiDocs = env => env.DOCS_API_URL || 'https://docs.googleapis.com';
 const model = env => env.GEMINI_MODEL || 'gemini-2.5-flash';
 const detikKini = () => Math.floor(Date.now() / 1000);
-const tautanDoc = id => `https://docs.google.com/document/d/${id}/edit`;
+export const tautanDoc = id => `https://docs.google.com/document/d/${id}/edit`;
 
 const PERINTAH = `Transkripsikan semua tulisan pada foto berikut — tulisan tangan maupun cetak — apa adanya dalam bahasa aslinya.
 Aturan:
@@ -162,7 +162,29 @@ async function ubahDoc(req, env, id) {
 }
 
 // ---------- kirim ke Google Docs ----------
-const waktuWib = () => {
+// Tambahkan blok (kepala Judul 3 + isi + garis) di akhir dokumen. false = dokumen tidak ada (404).
+export async function tulisDoc(env, token, docId, kepala, badan) {
+  const auth = { authorization: `Bearer ${token}` };
+  const url = `${apiDocs(env)}/v1/documents/${encodeURIComponent(docId)}`;
+  const g = await fetch(`${url}?fields=body/content/endIndex`, { headers: auth });
+  if (g.status === 404) return false;
+  if (!g.ok) throw new Galat(502, `Gagal membuka dokumen Google Docs (${g.status}).`);
+  const konten = (await g.json()).body?.content || [];
+  const akhir = Math.max(1, ...konten.map(c => c.endIndex || 1)) - 1; // sebelum baris baru terakhir dokumen
+  const sisip = `${kepala}\n${badan}\n────────────\n`;
+  const awalBadan = akhir + kepala.length + 1;
+  const r = await fetch(`${url}:batchUpdate`, {
+    method: 'POST', headers: { ...auth, 'content-type': 'application/json' },
+    body: JSON.stringify({ requests: [
+      { insertText: { location: { index: akhir }, text: sisip } },
+      { updateParagraphStyle: { range: { startIndex: akhir, endIndex: awalBadan }, paragraphStyle: { namedStyleType: 'HEADING_3' }, fields: 'namedStyleType' } },
+      { updateParagraphStyle: { range: { startIndex: awalBadan, endIndex: akhir + sisip.length }, paragraphStyle: { namedStyleType: 'NORMAL_TEXT' }, fields: 'namedStyleType' } },
+    ] }),
+  });
+  if (!r.ok) throw new Galat(502, `Gagal menulis ke Google Docs (${r.status}).`);
+  return true;
+}
+export const waktuWib = () => {
   const d = new Date(Date.now() + 7 * 3600e3);
   const p = n => String(n).padStart(2, '0');
   return `${p(d.getUTCDate())}-${p(d.getUTCMonth() + 1)}-${d.getUTCFullYear()} ${p(d.getUTCHours())}.${p(d.getUTCMinutes())} WIB`;
@@ -177,26 +199,9 @@ async function kirim(req, env, saya) {
   const doc = await env.DB.prepare('SELECT id, doc_id, nama FROM docs_tujuan WHERE id = ? AND aktif = 1 AND akun = ?').bind(Number(b.docs_id) || 0, akun || '').first();
   if (!doc) throw new Galat(400, 'Pilih dokumen tujuan.');
   const token = await siapDrive(env, 'Kirim ke Google Docs');
-  const auth = { authorization: `Bearer ${token}` };
-  const url = `${apiDocs(env)}/v1/documents/${encodeURIComponent(doc.doc_id)}`;
-  const g = await fetch(`${url}?fields=body/content/endIndex`, { headers: auth });
-  if (g.status === 404) throw new Galat(410, `Dokumen "${doc.nama}" sudah tidak ada di Google Docs. Minta Admin menyembunyikannya.`);
-  if (!g.ok) throw new Galat(502, `Gagal membuka dokumen Google Docs (${g.status}).`);
-  const konten = (await g.json()).body?.content || [];
-  const akhir = Math.max(1, ...konten.map(c => c.endIndex || 1)) - 1; // sebelum baris baru terakhir dokumen
-  const kepala = [judul, waktuWib(), saya.nama].filter(Boolean).join(' · ');
   const badan = isi.replace(/\r\n/g, '\n');
-  const sisip = `${kepala}\n${badan}\n────────────\n`;
-  const awalBadan = akhir + kepala.length + 1;
-  const r = await fetch(`${url}:batchUpdate`, {
-    method: 'POST', headers: { ...auth, 'content-type': 'application/json' },
-    body: JSON.stringify({ requests: [
-      { insertText: { location: { index: akhir }, text: sisip } },
-      { updateParagraphStyle: { range: { startIndex: akhir, endIndex: awalBadan }, paragraphStyle: { namedStyleType: 'HEADING_3' }, fields: 'namedStyleType' } },
-      { updateParagraphStyle: { range: { startIndex: awalBadan, endIndex: akhir + sisip.length }, paragraphStyle: { namedStyleType: 'NORMAL_TEXT' }, fields: 'namedStyleType' } },
-    ] }),
-  });
-  if (!r.ok) throw new Galat(502, `Gagal menulis ke Google Docs (${r.status}).`);
+  const ada = await tulisDoc(env, token, doc.doc_id, [judul, waktuWib(), saya.nama].filter(Boolean).join(' · '), badan);
+  if (!ada) throw new Galat(410, `Dokumen "${doc.nama}" sudah tidak ada di Google Docs. Minta Admin menyembunyikannya.`);
   await env.DB.prepare("INSERT INTO transkrip_riwayat (anggota_id, jenis, docs_id, judul, jumlah_foto, panjang, waktu) VALUES (?, 'kirim', ?, ?, ?, ?, ?)")
     .bind(saya.id, doc.id, judul || null, jumlahFoto, badan.length, detikKini()).run();
   return json({ ok: true, nama: doc.nama, tautan: tautanDoc(doc.doc_id) });

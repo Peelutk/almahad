@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 15)
+# Al-Ma'had — Desain Sistem (Draf 16)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -80,6 +80,10 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-64 | **Gemini API**: kunci di secret `GEMINI_API_KEY`, model di variabel `GEMINI_MODEL`; kuota habis → pesan *coba lagi nanti*; batas **30 kali baca per jam per anggota** | Akurat untuk tulisan tangan; model bisa diganti tanpa ubah kode | Paket gratis: foto boleh dipakai Google untuk perbaikan layanan — jangan transkrip dokumen rahasia |
 | A-65 | Foto **dikecilkan di browser** (sisi terpanjang 3000 px, JPEG) lalu dialirkan Worker → **Gemini Files API** (bukan base64 di JSON, agar CPU Worker gratis cukup), dibaca, lalu dihapus dari Gemini. Foto transkrip **tidak** disimpan ke Drive | Cepat & ringan | HEIC hanya bisa di Safari (Chrome tidak bisa membuka HEIC) |
 | A-66 | **Riwayat transkrip**: siapa, kapan, baca/kirim, dokumen tujuan, jumlah foto, panjang teks — **isi teks tidak disimpan**. Migrasi 6 = 2 tabel baru (`docs_tujuan`, `transkrip_riwayat`) | Bisa ditelusuri tanpa menyimpan isi | — |
+| A-67 | **Folder arsip edisi** di Drive yang sudah ada (mis. *ARSIP AL MAHAD / EDISI AL MAHAD* milik orang lain): Admin memilih folder induk **sekali** lewat **Google Drive Picker** (masuk sebagai akun Google yang terhubung) di *Pengaturan → Google*. Tetap izin `drive.file` — aplikasi hanya boleh membuat isi di folder yang dipilih. Butuh Google Picker API, API key `GOOGLE_PICKER_KEY` (dibatasi ke situs aplikasi), dan *Authorized JavaScript origin* | Tanpa izin Drive yang lebih luas; arsip tetap di tempat yang dipakai tim | Penyiapan tambahan di Google Cloud; ganti akun Google → folder induk harus dipilih ulang |
+| A-68 | **Edisi baru → folder otomatis** `EDISI KE <nomor>-(<TEMA>)` (awalan "No."/"Edisi" di nomor dibuang) berisi subfolder per **rubrik majalah aktif dari Daftar Pilihan**, bernomor sesuai urutan (`01_IFTITAH`, …). Semua ID folder disimpan (`arsip_folder`). Ganti nomor/tema → nama folder ikut diganti; rubrik baru → folder dibuat saat dibutuhkan. Gagal/belum diatur → edisi tetap tersimpan + tombol *Buat folder di Drive* | Arsip rapi tanpa membuat folder manual | Urutan rubrik yang diubah belakangan tidak mengganti nomor folder lama |
+| A-69 | **Transkrip → Simpan ke folder edisi**: pilih edisi (belum terbit, bawaan terbaru), rubrik majalah (otomatis dari naskah), nama penulis (otomatis, bisa diketik — termasuk penulis luar redaksi) → Google Docs `<edisi>/<rubrik>/<n. Penulis>/<Judul>`; nomor penulis = urutan kedatangan. Naskah yang sudah tersimpan: **satu dokumen per naskah** (`naskah.transkrip_doc_id`), transkrip berikutnya ditambahkan di bawah; dokumen terhapus → dibuat baru. *Kirim ke Google Docs* (A-63) tetap ada | Sama dengan struktur arsip yang sudah dipakai | — |
+| A-70 | Migrasi 7: tabel `arsip_folder` + kolom `naskah.transkrip_doc_id` (hanya menambah) | Aman untuk data lama | — |
 
 ## 3. Mindmap
 
@@ -107,6 +111,7 @@ mindmap
       Tautan foto
       Upload foto ke Drive
       Transkrip foto ke Google Docs
+      Folder arsip edisi di Drive
     Majalah
       Edisi
       Naskah jenis majalah
@@ -188,6 +193,7 @@ flowchart TD
 | `naskah_foto` | id, naskah_id, tautan (alamat web, atau `/api/foto/<id>` untuk foto upload), keterangan |
 | `docs_tujuan` | id, nama, doc_id (Google Docs, unik), akun (pemilik), aktif, dibuat_at — dokumen tujuan transkrip (A-63) |
 | `transkrip_riwayat` | id, anggota_id, jenis (`baca`/`kirim`), docs_id, judul, jumlah_foto, panjang, waktu — tanpa isi teks (A-66) |
+| `arsip_folder` | id, akun, edisi_id, rubrik_id (0 = folder edisi), penulis ('' = folder rubrik/edisi), nama, folder_id — ID folder arsip di Drive (A-68) |
 | `foto_upload` | id, drive_id (unik), nama, mime, ukuran, pengunggah_id, dibuat_at — foto yang diupload ke Drive (A-59) |
 | `naskah_riwayat` | id, naskah_id, dari_status, ke_status, oleh_id, catatan, waktu |
 | `edisi` | id, nomor, tema, bulan_terbit, status (`disusun`/`dikunci`/`terbit`) |

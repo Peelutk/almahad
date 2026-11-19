@@ -20,6 +20,7 @@ Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, E
 | `src/csv.js` | Upload CSV anggota (pratinjau & simpan) |
 | `src/drive.js` | Upload foto ke Google Drive & tampil lewat `/api/foto/<id>` |
 | `src/transkrip.js` | Transkrip foto (Gemini Files API) → pratinjau → Google Docs; dokumen tujuan; riwayat |
+| `src/arsip.js` | Folder arsip edisi di Drive (Picker, folder edisi/rubrik/penulis), transkrip → folder edisi |
 | `src/redaksi.js` | API tugas, naskah, antrean, edisi, ringkasan dasbor |
 | `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
 | `src/email.js` | Notifikasi email: Gmail API, antrean, pengingat tenggat (Cron), pengaturan email |
@@ -41,6 +42,7 @@ Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, E
    - Masuk sebagai Admin → **Pengaturan → Google** → *Hubungkan akun Google* (centang izin Gmail **dan** Drive) → *Kirim email uji* → *Aktifkan*.
    - Foto upload disimpan di folder Drive *Al-Ma'had – Foto* milik akun itu (privat, ditampilkan lewat aplikasi).
    - **Transkrip foto**: buat API key di Google AI Studio → secret Worker `GEMINI_API_KEY` (jangan ditulis di repo/chat). Model diatur variabel `GEMINI_MODEL` di `wrangler.jsonc`. Lalu Admin membuat dokumen tujuan di **Pengaturan → Google**.
+   - **Folder arsip edisi** (Google Cloud, proyek OAuth): aktifkan **Google Picker API**; buat API key yang dibatasi ke `https://almahad.jaohongk.workers.dev/*` dan Picker API → variabel Worker `GOOGLE_PICKER_KEY` (dashboard, jangan di repo); OAuth Client → *Authorized JavaScript origins* tambah `https://almahad.jaohongk.workers.dev`. Lalu Admin → **Pengaturan → Google** → *Pilih folder arsip edisi* (masuk sebagai akun yang terhubung) → pilih folder induk, mis. *EDISI AL MAHAD*.
 6. **Login NIS** (tanpa pengaturan tambahan): Admin mengisi NIS anggota (satu per satu atau **Upload CSV** `NIS;Nama;Kelas`, email otomatis `NIS@daarululuumlido.com`) → password awal = NIS → anggota wajib ganti saat pertama masuk. Opsional: variabel `PBKDF2_ITERASI` (bawaan 10000).
 7. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
 

@@ -204,6 +204,26 @@ export const MIGRASI = [
       `CREATE INDEX IF NOT EXISTS transkrip_riwayat_anggota ON transkrip_riwayat(anggota_id, jenis, waktu)`,
     ],
   },
+  {
+    // A-67..A-70: ID folder arsip edisi/rubrik/penulis di Drive + dokumen transkrip per naskah.
+    // Hanya tabel baru & kolom baru (naskah tidak dibangun ulang).
+    versi: 7,
+    nama: 'Folder arsip edisi di Google Drive',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS arsip_folder (
+        id INTEGER PRIMARY KEY,
+        akun TEXT NOT NULL,
+        edisi_id INTEGER NOT NULL,
+        rubrik_id INTEGER NOT NULL DEFAULT 0,
+        penulis TEXT NOT NULL DEFAULT '',
+        nama TEXT NOT NULL,
+        folder_id TEXT NOT NULL,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (akun, edisi_id, rubrik_id, penulis)
+      )`,
+      `ALTER TABLE naskah ADD COLUMN transkrip_doc_id TEXT`,
+    ],
+  },
 ];
 
 let siap = false;

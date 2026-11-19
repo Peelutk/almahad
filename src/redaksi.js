@@ -1,5 +1,6 @@
 // Modul redaksi: tugas liputan, naskah, antrean, edisi majalah.
 // Aturan mengacu ke DESAIN.md (A-05, A-09..A-17, A-23).
+import { siapkanFolderEdisi, gantiNamaFolderEdisi, infoFolderEdisi } from './arsip.js';
 import { Galat, json, bacaJson, teks, wajib } from './umum.js';
 import { notifTugas, notifNaskah } from './email.js';
 
@@ -310,7 +311,9 @@ async function tambahEdisi(req, env) {
   if (!d.nomor) throw new Galat(400, 'Nomor edisi wajib diisi.');
   if (await env.DB.prepare('SELECT 1 FROM edisi WHERE nomor = ?').bind(d.nomor).first()) throw new Galat(409, 'Nomor edisi sudah ada.');
   const r = await env.DB.prepare('INSERT INTO edisi (nomor, tema, bulan_terbit) VALUES (?, ?, ?) RETURNING id').bind(d.nomor, d.tema, d.bulan).first();
-  return json({ id: r.id }, 201);
+  // Folder arsip edisi + rubrik di Drive (A-68). Gagal → edisi tetap tersimpan, bisa dicoba lagi.
+  const folder_galat = await siapkanFolderEdisi(env, r.id);
+  return json({ id: r.id, folder_galat }, 201);
 }
 async function ubahEdisi(req, env, id) {
   const e = await ambilEdisi(env, id);
@@ -318,6 +321,7 @@ async function ubahEdisi(req, env, id) {
   const d = dataEdisi(await bacaJson(req), e);
   if (await env.DB.prepare('SELECT 1 FROM edisi WHERE nomor = ? AND id <> ?').bind(d.nomor, id).first()) throw new Galat(409, 'Nomor edisi sudah ada.');
   await env.DB.prepare('UPDATE edisi SET nomor = ?, tema = ?, bulan_terbit = ? WHERE id = ?').bind(d.nomor, d.tema, d.bulan, id).run();
+  await gantiNamaFolderEdisi(env, { ...e, nomor: d.nomor, tema: d.tema });
   return json({ ok: true });
 }
 async function detailEdisi(env, id) {
@@ -332,7 +336,7 @@ async function detailEdisi(env, id) {
     FROM naskah n JOIN pilihan r ON r.id = n.rubrik_id JOIN anggota a ON a.id = n.penulis_id
     WHERE n.jenis = 'majalah' AND n.status = 'terbit' AND n.id NOT IN (SELECT naskah_id FROM edisi_naskah)
     ORDER BY n.diubah_at DESC`).all()).results;
-  return { ...e, naskah: isi, calon };
+  return { ...e, naskah: isi, calon, folder: await infoFolderEdisi(env, id) };
 }
 async function wajibDisusun(env, id) {
   const e = await ambilEdisi(env, id);
