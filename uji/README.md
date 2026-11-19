@@ -10,6 +10,9 @@ GOOGLE_CLIENT_SECRET=rahasia-uji
 GOOGLE_TOKEN_URL=http://127.0.0.1:8791/token
 GMAIL_API_URL=http://127.0.0.1:8791
 DRIVE_API_URL=http://127.0.0.1:8791
+GEMINI_API_URL=http://127.0.0.1:8791
+DOCS_API_URL=http://127.0.0.1:8791
+GEMINI_API_KEY=kunci-gemini-uji
 ENKRIPSI_KUNCI=kunci-uji-lokal
 ```
 
@@ -28,6 +31,7 @@ Jalankan: `bash uji/jalankan.sh`
 | `klik-csv.mjs` | Uji klik di Chrome: Upload CSV (file ANSI), pratinjau, simpan, email otomatis di form |
 | `foto.mjs` | Upload foto ke Drive (tiruan): izin, folder, file 20 MB, tampil pratinjau/asli, akses |
 | `klik-foto.mjs` | Uji klik di Chrome: upload foto (progres, tolak bukan foto / > 20 MB), keterangan, simpan, cetak, halaman Google |
-| `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail API + Drive API (port 8791) |
+| `transkrip.mjs` | Transkrip foto: Gemini (tiruan) — kirim foto, baca, batas, kuota; dokumen tujuan & kirim ke Google Docs (tiruan); riwayat |
+| `tiruan-google.mjs` | Server tiruan Google OAuth + Gmail + Drive + Docs + Gemini (port 8791) |
 
 `/api/uji/masuk` hanya aktif bila `UJI_LOGIN=1` **dan** host `localhost` — tidak berlaku di Worker asli.

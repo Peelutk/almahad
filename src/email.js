@@ -268,6 +268,7 @@ export async function apiEmail(req, env, saya, p, m) {
       aktif: (await ambilAtur(env, 'email_aktif')) === '1', kunci_ada: !!env.ENKRIPSI_KUNCI,
       drive: status === 'terhubung' && (await ambilAtur(env, 'drive_izin')) === '1',
       drive_folder: await ambilAtur(env, 'drive_folder'),
+      gemini: !!env.GEMINI_API_KEY,
       jumlah: Object.fromEntries(jumlah.map(j => [j.status, j.n])), terbaru,
     });
   }

@@ -1,4 +1,4 @@
-# Al-Ma'had — Desain Sistem (Draf 14)
+# Al-Ma'had — Desain Sistem (Draf 15)
 
 > Status: **TAHAP KODE — semua modul** (login, anggota, periode, daftar pilihan, tugas, naskah, antrean, edisi, cetak). Keputusan baru tetap dicatat di sini.
 > Proyek ini **berdiri sendiri**: tidak terkait ProjectJao/HISADA, inventaris Amar, maupun Veinmara.
@@ -74,6 +74,12 @@ atau menyusunnya ke dalam **edisi majalah**. Tidak ada halaman untuk pembaca umu
 | A-58 | Drive: folder **"Al-Ma'had – Foto"** dibuat otomatis, subfolder per bulan (`2026-11`); nama file `tanggal-jam_nama-asli` | Rapi tanpa perlu naskah tersimpan dulu | Tidak dikelompokkan per naskah |
 | A-59 | **Foto ditampilkan lewat aplikasi** (`/api/foto/<id>`), file Drive tetap privat; hanya anggota yang sudah masuk (termasuk login NIS), juga di halaman cetak. Yang ditampilkan pratinjau Google ±1600 px (disimpan di cache browser 1 hari); *Unduh asli* untuk file penuh. Hanya file yang tercatat di tabel `foto_upload` yang dilayani (migrasi 5 = tabel baru saja) | Privat & ringan; tidak perlu login Google | Tiap tampilan memakai kuota permintaan Worker; pratinjau Google kadang baru siap beberapa detik setelah upload (sementara itu file asli yang dikirim). Cache Cloudflare tidak dipakai karena tidak aktif di `*.workers.dev` |
 | A-60 | Menghapus foto dari naskah **tidak** menghapus file di Drive | Aman dari salah hapus | File tak terpakai perlu dibersihkan manual di Drive |
+| A-61 | **Transkrip foto** (Reporter, Editor, Pemred): tombol *📝 Transkrip foto* di form naskah + menu **Transkrip Foto**. Tanpa Google Apps Script — Worker memanggil Gemini API & Google Docs API langsung | Satu sistem, tanpa deploy/rahasia tambahan | — |
+| A-62 | Alur: pilih **1–5 foto** (kamera/galeri) → *Baca tulisan* (Gemini; tulisan tangan & cetak; paragraf dipertahankan; tak terbaca = `[?]`) → **pratinjau teks yang bisa diedit** → *Kirim ke Google Docs* dan/atau *Salin ke isi naskah* (bila dari form naskah) | Hasil diperiksa manusia sebelum dipakai | Hasil AI bisa keliru — wajib dibaca ulang |
+| A-63 | **Dokumen tujuan dibuat oleh aplikasi** (Admin, *Pengaturan → Google*: tambah, ganti nama, sembunyikan) di folder Drive *Al-Ma'had – Transkrip*; pengguna memilih tujuan saat mengirim. Transkrip **ditambahkan di akhir** dokumen: baris judul (judul opsional · tanggal jam WIB · nama pengirim, gaya Judul 3) + isi + garis pemisah | Cukup izin `drive.file`, tanpa verifikasi Google; dokumen bisa dibagikan ke tim lewat Google Docs | Dokumen Google Docs yang sudah ada **tidak** bisa dipakai; ganti akun Google → dokumen lama tidak muncul lagi |
+| A-64 | **Gemini API**: kunci di secret `GEMINI_API_KEY`, model di variabel `GEMINI_MODEL`; kuota habis → pesan *coba lagi nanti*; batas **30 kali baca per jam per anggota** | Akurat untuk tulisan tangan; model bisa diganti tanpa ubah kode | Paket gratis: foto boleh dipakai Google untuk perbaikan layanan — jangan transkrip dokumen rahasia |
+| A-65 | Foto **dikecilkan di browser** (sisi terpanjang 3000 px, JPEG) lalu dialirkan Worker → **Gemini Files API** (bukan base64 di JSON, agar CPU Worker gratis cukup), dibaca, lalu dihapus dari Gemini. Foto transkrip **tidak** disimpan ke Drive | Cepat & ringan | HEIC hanya bisa di Safari (Chrome tidak bisa membuka HEIC) |
+| A-66 | **Riwayat transkrip**: siapa, kapan, baca/kirim, dokumen tujuan, jumlah foto, panjang teks — **isi teks tidak disimpan**. Migrasi 6 = 2 tabel baru (`docs_tujuan`, `transkrip_riwayat`) | Bisa ditelusuri tanpa menyimpan isi | — |
 
 ## 3. Mindmap
 
@@ -100,6 +106,7 @@ mindmap
       Rubrik
       Tautan foto
       Upload foto ke Drive
+      Transkrip foto ke Google Docs
     Majalah
       Edisi
       Naskah jenis majalah
@@ -179,6 +186,8 @@ flowchart TD
 | `tugas` | id, judul, keterangan, jenis, rubrik_id → `pilihan`, pemberi_id, reporter_id, tenggat (wajib), status (`baru`/`dikerjakan`/`selesai`/`batal`); "terlambat" dihitung dari tenggat, tidak disimpan |
 | `naskah` | id, jenis (`berita`/`majalah`), judul, rubrik_id → `pilihan`, penulis_id, tugas_id (boleh kosong), isi, status, dibuat_at, diubah_at |
 | `naskah_foto` | id, naskah_id, tautan (alamat web, atau `/api/foto/<id>` untuk foto upload), keterangan |
+| `docs_tujuan` | id, nama, doc_id (Google Docs, unik), akun (pemilik), aktif, dibuat_at — dokumen tujuan transkrip (A-63) |
+| `transkrip_riwayat` | id, anggota_id, jenis (`baca`/`kirim`), docs_id, judul, jumlah_foto, panjang, waktu — tanpa isi teks (A-66) |
 | `foto_upload` | id, drive_id (unik), nama, mime, ukuran, pengunggah_id, dibuat_at — foto yang diupload ke Drive (A-59) |
 | `naskah_riwayat` | id, naskah_id, dari_status, ke_status, oleh_id, catatan, waktu |
 | `edisi` | id, nomor, tema, bulan_terbit, status (`disusun`/`dikunci`/`terbit`) |

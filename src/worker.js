@@ -8,6 +8,7 @@ import {
 import { csvAnggota, POLA_NIS } from './csv.js';
 import { apiRedaksi } from './redaksi.js';
 import { apiFoto } from './drive.js';
+import { apiTranskrip } from './transkrip.js';
 import { apiEmail, paramGmail, simpanPengirim, prosesAntrean, jadwal } from './email.js';
 
 const KELOMPOK = { rubrik_berita: 'Rubrik berita', rubrik_majalah: 'Rubrik majalah' };
@@ -486,6 +487,10 @@ async function api(req, env, url) {
   // Foto upload ke Google Drive (A-55..A-60).
   const hasilFoto = await apiFoto(req, env, saya, p, m);
   if (hasilFoto) return hasilFoto;
+
+  // Transkrip foto → Google Docs (A-61..A-66).
+  const hasilTranskrip = await apiTranskrip(req, env, saya, p, m);
+  if (hasilTranskrip) return hasilTranskrip;
 
   // Modul redaksi: tugas, naskah, antrean, edisi.
   const hasil = await apiRedaksi(req, env, saya, p, m);

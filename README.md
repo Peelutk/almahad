@@ -9,7 +9,7 @@ Sistem redaksi internal organisasi jurnalistik santri — Cloudflare Workers + D
 ## Status
 
 Semua modul tersedia: login Google & NIS + password, Anggota & peran (termasuk Upload CSV), Periode, Daftar Pilihan, Tugas Liputan,
-Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah), Notifikasi Email (Gmail API + Cron), Upload Foto (Google Drive).
+Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, Edisi Majalah, Halaman Cetak (edisi & naskah), Notifikasi Email (Gmail API + Cron), Upload Foto (Google Drive), Transkrip Foto (Gemini → Google Docs).
 
 ## Struktur
 
@@ -19,6 +19,7 @@ Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, E
 | `src/worker.js` | API `/api/*`: login Google, sesi, anggota, periode, daftar pilihan |
 | `src/csv.js` | Upload CSV anggota (pratinjau & simpan) |
 | `src/drive.js` | Upload foto ke Google Drive & tampil lewat `/api/foto/<id>` |
+| `src/transkrip.js` | Transkrip foto (Gemini Files API) → pratinjau → Google Docs; dokumen tujuan; riwayat |
 | `src/redaksi.js` | API tugas, naskah, antrean, edisi, ringkasan dasbor |
 | `src/umum.js` | Pembantu bersama (galat, JSON, validasi, akses peran) |
 | `src/email.js` | Notifikasi email: Gmail API, antrean, pengingat tenggat (Cron), pengaturan email |
@@ -36,9 +37,10 @@ Naskah (upload foto ke Google Drive / tautan foto + riwayat), Antrean Redaksi, E
    - `GOOGLE_CLIENT_SECRET` = client secret dari Google. **Jangan** ditulis di repo atau dikirim lewat chat.
 5. **Akun Google untuk Email & Drive** (sekali):
    - Secret `ENKRIPSI_KUNCI` = teks acak panjang (kunci enkripsi token Gmail). Jangan diganti setelah dipakai.
-   - Google Cloud Console (proyek OAuth yang sama): aktifkan **Gmail API** dan **Google Drive API**; di *OAuth consent screen → Data access* tambahkan scope `.../auth/gmail.send` dan `.../auth/drive.file`; status aplikasi **In production**.
+   - Google Cloud Console (proyek OAuth yang sama): aktifkan **Gmail API**, **Google Drive API**, dan **Google Docs API**; di *OAuth consent screen → Data access* tambahkan scope `.../auth/gmail.send` dan `.../auth/drive.file`; status aplikasi **In production**.
    - Masuk sebagai Admin → **Pengaturan → Google** → *Hubungkan akun Google* (centang izin Gmail **dan** Drive) → *Kirim email uji* → *Aktifkan*.
    - Foto upload disimpan di folder Drive *Al-Ma'had – Foto* milik akun itu (privat, ditampilkan lewat aplikasi).
+   - **Transkrip foto**: buat API key di Google AI Studio → secret Worker `GEMINI_API_KEY` (jangan ditulis di repo/chat). Model diatur variabel `GEMINI_MODEL` di `wrangler.jsonc`. Lalu Admin membuat dokumen tujuan di **Pengaturan → Google**.
 6. **Login NIS** (tanpa pengaturan tambahan): Admin mengisi NIS anggota (satu per satu atau **Upload CSV** `NIS;Nama;Kelas`, email otomatis `NIS@daarululuumlido.com`) → password awal = NIS → anggota wajib ganti saat pertama masuk. Opsional: variabel `PBKDF2_ITERASI` (bawaan 10000).
 7. **Admin pertama**: masuk dengan `216326@daarululuumlido.com` → otomatis menjadi Admin + Pemred (hanya selama belum ada Admin).
 

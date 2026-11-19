@@ -352,6 +352,7 @@ const PESAN_EMAIL = {
 const STATUS_EMAIL = { menunggu: ['Menunggu', 'l-diajukan'], dikirim: ['Dikirim', 'l-diajukan'], terkirim: ['Terkirim', 'l-terbit'], gagal: ['Gagal', 'l-ditolak'] };
 async function halEmail(args) {
   const e = await api('/api/email');
+  const docs = e.drive ? await api('/api/docs-tujuan') : [];
   const pesan = PESAN_EMAIL[args[0]];
   const tanggal = s => s ? new Date(s.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   const st = { belum: 'Belum dihubungkan', terhubung: 'Terhubung', putus: 'Terputus — hubungkan ulang' }[e.status] || e.status;
@@ -372,6 +373,18 @@ async function halEmail(args) {
       : e.status === 'terhubung' ? 'Belum aktif — izin Google Drive belum diberikan. Tekan <b>Hubungkan ulang</b> dan centang izin Drive.' : 'Belum aktif — hubungkan akun Google terlebih dahulu.'}</span>
     <p class="sub" style="margin:8px 0 0;font-size:13px">Foto hanya bisa dilihat anggota lewat aplikasi (file di Drive tetap privat). Menghapus foto dari naskah tidak menghapus file di Drive.</p>
   </div>
+  <div class="kartu"><b>Transkrip foto → Google Docs</b><br>
+    <span class="${e.gemini ? '' : 'sub'}">${e.gemini ? 'Pembaca foto (Gemini) aktif.' : 'Pembaca foto belum aktif — pasang secret <code>GEMINI_API_KEY</code> di Worker.'}</span>
+    <p class="sub" style="margin:8px 0;font-size:13px">Dokumen tujuan dibuat oleh aplikasi di folder Drive <i>Al-Ma&#39;had – Transkrip</i> (dokumen Google Docs yang sudah ada tidak bisa dipakai). Bagikan dokumen ke tim lewat Google Docs bila perlu.</p>
+    ${e.drive ? `${docs.length ? `<div class="tabel-wadah"><table><tr><th>Dokumen</th><th>Status</th><th></th></tr>
+      ${docs.map(d => `<tr style="${d.aktif ? '' : 'opacity:.6'}"><td><a href="${esc(d.tautan)}" target="_blank" rel="noopener noreferrer">${esc(d.nama)} ↗</a></td>
+        <td>${d.aktif ? 'Tampil' : 'Disembunyikan'}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn kecil" onclick="namaiDoc(${d.id})">Ganti nama</button>
+          <button class="btn kecil" onclick="aturDoc(${d.id}, ${!d.aktif})">${d.aktif ? 'Sembunyikan' : 'Tampilkan'}</button></td></tr>`).join('')}</table></div>` : '<div class="kosong">Belum ada dokumen tujuan.</div>'}
+      <form class="baris" onsubmit="buatDocTujuan(event)" style="margin-top:10px"><input type="text" name="nama" required maxlength="100" placeholder="Nama dokumen baru, mis. Catatan Liputan" style="flex:1;min-width:200px">
+        <button class="btn utama">+ Buat dokumen</button></form>`
+      : '<div class="sub">Hubungkan akun Google dengan izin Drive terlebih dahulu.</div>'}
+  </div>
   <div class="kartu">
     <div class="baris antara"><div><b>Kirim notifikasi</b><br><span class="sub">${e.aktif ? 'Aktif — email dikirim untuk setiap kejadian.' : 'Nonaktif — tidak ada email yang dikirim atau diantrekan.'}</span></div>
       <div class="baris">
@@ -390,6 +403,17 @@ async function halEmail(args) {
       : '<div class="kosong">Belum ada email.</div>'}
   </div>`;
 }
+function buatDocTujuan(e) {
+  e.preventDefault();
+  const nama = new FormData(e.target).get('nama');
+  e.target.querySelector('button').disabled = true;
+  coba(() => api('/api/docs-tujuan', 'POST', { nama }).then(() => toast('Dokumen dibuat di Google Docs.')));
+}
+function namaiDoc(id) {
+  const nama = prompt('Nama dokumen baru:');
+  if (nama && nama.trim()) coba(() => api(`/api/docs-tujuan/${id}`, 'PUT', { nama }));
+}
+const aturDoc = (id, aktif) => coba(() => api(`/api/docs-tujuan/${id}`, 'PUT', { aktif }));
 async function ujiEmail() {
   try { const r = await api('/api/email/uji', 'POST'); toast(`Email uji terkirim ke ${r.ke}. Cek kotak masuk.`); }
   catch (e) { toast(e.message); }
@@ -404,6 +428,7 @@ const MENU = [
   ['dasbor', 'Dasbor', () => true, halDasbor],
   ['tugas', 'Tugas Liputan', () => punya('reporter', 'editor', 'pemred'), halTugas],
   ['naskah', 'Naskah', () => punya('reporter', 'editor', 'pemred'), a => a.length ? halNaskahDetail(a) : halNaskah()],
+  ['transkrip', 'Transkrip Foto', () => punya('reporter', 'editor', 'pemred'), halTranskrip],
   ['antrean', 'Antrean Redaksi', () => punya('editor', 'pemred'), halAntrean],
   ['edisi', 'Edisi Majalah', () => punya('pemred'), halEdisi],
   ['cetak', 'Cetak edisi', () => punya('pemred'), halCetak, false],

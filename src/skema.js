@@ -178,6 +178,32 @@ export const MIGRASI = [
       )`,
     ],
   },
+  {
+    // Hanya tabel baru (A-63, A-66): dokumen tujuan transkrip & riwayat transkrip (tanpa isi teks).
+    versi: 6,
+    nama: 'Transkrip foto ke Google Docs',
+    sql: [
+      `CREATE TABLE IF NOT EXISTS docs_tujuan (
+        id INTEGER PRIMARY KEY,
+        nama TEXT NOT NULL,
+        doc_id TEXT NOT NULL UNIQUE,
+        akun TEXT NOT NULL,
+        aktif INTEGER NOT NULL DEFAULT 1,
+        dibuat_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      `CREATE TABLE IF NOT EXISTS transkrip_riwayat (
+        id INTEGER PRIMARY KEY,
+        anggota_id INTEGER REFERENCES anggota(id),
+        jenis TEXT NOT NULL,
+        docs_id INTEGER REFERENCES docs_tujuan(id),
+        judul TEXT,
+        jumlah_foto INTEGER NOT NULL DEFAULT 0,
+        panjang INTEGER NOT NULL DEFAULT 0,
+        waktu INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS transkrip_riwayat_anggota ON transkrip_riwayat(anggota_id, jenis, waktu)`,
+    ],
+  },
 ];
 
 let siap = false;

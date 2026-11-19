@@ -7,12 +7,12 @@ import { ambilAtur, aturStmt, tokenAkses } from './email.js';
 export const MAKS_UKURAN = 20 * 1024 * 1024;
 const JENIS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'image/gif': 'gif' };
 const MIME_FOLDER = 'application/vnd.google-apps.folder';
-const apiDrive = env => env.DRIVE_API_URL || 'https://www.googleapis.com';
+export const apiDrive = env => env.DRIVE_API_URL || 'https://www.googleapis.com';
 const kiniWib = () => new Date(Date.now() + 7 * 3600e3).toISOString(); // 2026-11-16T21:05:09.123Z (jam WIB)
 
-async function siapDrive(env) {
+export async function siapDrive(env, fitur = 'Upload foto') {
   if ((await ambilAtur(env, 'gmail_status')) !== 'terhubung' || (await ambilAtur(env, 'drive_izin')) !== '1')
-    throw new Galat(503, 'Upload foto belum aktif: Admin perlu menghubungkan akun Google dengan izin Drive (Pengaturan → Google).');
+    throw new Galat(503, `${fitur} belum aktif: Admin perlu menghubungkan akun Google dengan izin Drive (Pengaturan → Google).`);
   try { return await tokenAkses(env); } catch (e) { throw new Galat(503, 'Akun Google untuk Drive bermasalah: ' + e.message); }
 }
 
@@ -26,7 +26,7 @@ async function buatFolder(env, token, nama, induk) {
   return d.id;
 }
 // Folder disimpan di pengaturan; bila dua upload bersamaan membuat folder, yang tersimpan pertama dipakai.
-async function folder(env, token, kunci, nama, induk) {
+export async function folder(env, token, kunci, nama, induk) {
   const ada = await ambilAtur(env, kunci);
   if (ada) return ada;
   const id = await buatFolder(env, token, nama, induk);

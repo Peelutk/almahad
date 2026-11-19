@@ -218,7 +218,8 @@ async function halNaskahDetail(args) {
           <div><label>Rubrik</label><select name="rubrik_id">${opsiRubrik(n.jenis)}</select></div>
         </div>
         ${n.tugas ? `<p class="sub" style="margin:8px 0 0">Dari tugas: <b>${esc(n.tugas.judul)}</b> (tenggat ${tgl(n.tugas.tenggat)})</p>` : ''}
-        <label>Isi naskah</label><textarea name="isi" maxlength="60000" placeholder="Pisahkan paragraf dengan baris kosong.">${esc(n.isi)}</textarea>
+        <div class="baris antara" style="margin-top:12px"><label style="margin:0">Isi naskah</label>
+          <button class="btn kecil" type="button" onclick="dialogTranskrip()">📝 Transkrip foto</button></div><textarea name="isi" maxlength="60000" placeholder="Pisahkan paragraf dengan baris kosong.">${esc(n.isi)}</textarea>
         <label>Foto</label>
         <div id="daftar-foto"></div>
         <div class="baris" style="margin-bottom:8px"><label class="btn kecil" style="margin:0;cursor:pointer">📤 Upload foto
@@ -265,13 +266,14 @@ const MAKS_FOTO = 20, MAKS_UKURAN_FOTO = 20 * 1024 * 1024;
 const JENIS_FOTO = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', gif: 'image/gif' };
 const FOTO_ACCEPT = '.jpg,.jpeg,.png,.webp,.heic,.heif,.gif,image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif';
 const ukuranMb = b => (b / 1048576).toFixed(1).replace('.', ',') + ' MB';
-function kirimFoto(file, jenis, kemajuan) {
+const kirimFoto = (file, jenis, kemajuan) => kirimBerkas('/api/foto', file, jenis, file.name, kemajuan);
+function kirimBerkas(jalur, file, jenis, nama, kemajuan) {
   return new Promise((selesai, gagal) => {
     const x = new XMLHttpRequest();
-    x.open('POST', '/api/foto');
+    x.open('POST', jalur);
     x.setRequestHeader('x-almahad', '1');
     x.setRequestHeader('content-type', jenis);
-    x.setRequestHeader('x-nama-file', encodeURIComponent(file.name));
+    x.setRequestHeader('x-nama-file', encodeURIComponent(nama));
     x.upload.onprogress = e => e.lengthComputable && kemajuan(e.loaded / e.total);
     x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch {} x.status === 201 ? selesai(d) : gagal(new Error(d.galat || `Upload gagal (${x.status}).`)); };
     x.onerror = () => gagal(new Error('Koneksi terputus saat upload.'));
@@ -444,4 +446,128 @@ async function halCetakNaskah(args) {
   return `<div class="baris antara cetak-alat" style="margin-bottom:14px"><a href="#naskah/${n.id}">← Kembali</a>
     <button class="btn utama" onclick="window.print()">🖨 Cetak / Simpan PDF</button></div>
   <div class="kertas"><div class="meta">${jenisNama(n.jenis)} · ${esc(n.rubrik)} · ${STATUS_NASKAH[n.status][0]}</div>${artikelCetak(n)}</div>`;
+}
+
+// ---------- transkrip foto → pratinjau → Google Docs / naskah (A-61..A-66) ----------
+const MAKS_FOTO_TRANSKRIP = 5;
+function htmlTranskrip(data, keNaskah) {
+  if (!data.aktif) return '<div class="galat">Transkrip belum aktif: Admin perlu memasang secret GEMINI_API_KEY di Worker.</div>';
+  return `<div class="transkrip">
+    <p class="sub" style="margin-top:0">Foto tulisan tangan atau cetak (maks ${MAKS_FOTO_TRANSKRIP} foto, misalnya beberapa halaman catatan). Hasil dari AI bisa keliru — periksa sebelum dikirim. Jangan untuk dokumen rahasia.</p>
+    <div class="baris"><label class="btn" style="margin:0;cursor:pointer">📷 Pilih foto
+      <input type="file" class="t-file" accept="image/*" multiple hidden></label>
+      <button class="btn utama t-baca" type="button" disabled>Baca tulisan</button>
+      <span class="sub t-status" style="font-size:13px"></span></div>
+    <div class="galeri t-foto" style="margin-top:10px"></div>
+    <div class="t-hasil" hidden>
+      <label>Pratinjau — periksa & betulkan bila perlu</label>
+      <textarea class="t-teks" maxlength="50000" style="min-height:260px"></textarea>
+      <div class="grid" style="margin:0">
+        <div><label>Judul (opsional)</label><input type="text" class="t-judul" maxlength="150" placeholder="mis. Wawancara Ustadz Ahmad"></div>
+        <div><label>Dokumen Google Docs tujuan</label><select class="t-docs">${data.docs.length
+          ? '<option value="">— pilih dokumen —</option>' + data.docs.map(d => `<option value="${d.id}">${esc(d.nama)}</option>`).join('')
+          : '<option value="">(belum ada — minta Admin membuat di Pengaturan → Google)</option>'}</select></div>
+      </div>
+      <div class="baris" style="margin-top:12px"><button class="btn utama t-kirim" type="button" ${data.docs.length ? '' : 'disabled'}>Kirim ke Google Docs</button>
+        ${keNaskah ? '<button class="btn t-naskah" type="button">Salin ke isi naskah</button>' : ''}</div>
+    </div>
+    <div class="galat t-galat" hidden></div>
+    <div class="t-ok"></div>
+  </div>`;
+}
+// Dikecilkan di browser (sisi terpanjang 3000 px, JPEG) sebelum dikirim (A-65).
+async function kecilkanFoto(file) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch { throw new Error(`${file.name}: format tidak bisa dibuka di browser ini (HEIC? pakai JPG/PNG).`); }
+  const skala = Math.min(1, 3000 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * skala); c.height = Math.round(bmp.height * skala);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  if (bmp.close) bmp.close();
+  return new Promise((ok, tolak) => c.toBlob(b => b ? ok(b) : tolak(new Error('Gagal memproses foto.')), 'image/jpeg', 0.88));
+}
+function pasangTranskrip(w, keNaskah) {
+  if (!w || !w.querySelector('.transkrip')) return;
+  const foto = [];
+  const q = k => w.querySelector(k);
+  const status = t => { q('.t-status').textContent = t; };
+  const galat = t => { const g = q('.t-galat'); g.hidden = !t; g.textContent = t || ''; };
+  const gambar = () => {
+    q('.t-foto').innerHTML = foto.map((f, i) => `<div class="foto-item"><figure class="foto foto-kecil"><img src="${f.url}" alt="Foto ${i + 1}"></figure>
+      <button class="btn kecil" type="button" data-hapus="${i}">Hapus</button></div>`).join('');
+    q('.t-baca').disabled = !foto.length;
+  };
+  q('.t-foto').onclick = e => {
+    const i = e.target.dataset ? e.target.dataset.hapus : undefined;
+    if (i !== undefined) { URL.revokeObjectURL(foto[i].url); foto.splice(Number(i), 1); gambar(); }
+  };
+  q('.t-file').onchange = e => {
+    galat('');
+    for (const file of [...e.target.files]) {
+      if (foto.length >= MAKS_FOTO_TRANSKRIP) { galat(`Maksimal ${MAKS_FOTO_TRANSKRIP} foto sekali baca.`); break; }
+      foto.push({ file, url: URL.createObjectURL(file) });
+    }
+    e.target.value = ''; gambar();
+  };
+  q('.t-baca').onclick = async () => {
+    galat(''); q('.t-ok').innerHTML = '';
+    const tombol = q('.t-baca'); tombol.disabled = true;
+    try {
+      const berkas = [];
+      for (const [i, f] of foto.entries()) {
+        status(`Menyiapkan foto ${i + 1}/${foto.length}…`);
+        const blob = await kecilkanFoto(f.file);
+        const d = await kirimBerkas('/api/transkrip/foto', blob, 'image/jpeg', f.file.name,
+          v => status(`Mengirim foto ${i + 1}/${foto.length} (${Math.round(v * 100)}%)…`));
+        berkas.push({ berkas: d.berkas, mime: d.mime });
+      }
+      status('Membaca tulisan… (bisa sampai ±30 detik)');
+      const r = await api('/api/transkrip/baca', 'POST', { berkas });
+      q('.t-teks').value = r.teks; q('.t-hasil').hidden = false; status('Selesai — periksa hasilnya di bawah.');
+    } catch (e) { galat(e.message); status(''); }
+    tombol.disabled = !foto.length;
+  };
+  q('.t-kirim').onclick = async () => {
+    galat(''); q('.t-ok').innerHTML = '';
+    const docs_id = Number(q('.t-docs').value);
+    if (!docs_id) return galat('Pilih dokumen tujuan.');
+    if (!q('.t-teks').value.trim()) return galat('Teks transkrip kosong.');
+    const t = q('.t-kirim'); t.disabled = true;
+    try {
+      const r = await api('/api/transkrip/kirim', 'POST', { docs_id, judul: q('.t-judul').value, teks: q('.t-teks').value, jumlah_foto: foto.length });
+      q('.t-ok').innerHTML = `<div class="kartu" style="border-color:var(--utama);margin-top:12px">Terkirim ke <b>${esc(r.nama)}</b>. <a href="${esc(r.tautan)}" target="_blank" rel="noopener noreferrer">Buka dokumen ↗</a></div>`;
+      toast('Transkrip terkirim ke Google Docs.');
+    } catch (e) { galat(e.message); }
+    t.disabled = false;
+  };
+  if (keNaskah) q('.t-naskah').onclick = () => {
+    const f = $('#f-naskah');
+    const teks = q('.t-teks').value.trim();
+    if (!f || !teks) return galat('Tidak ada teks untuk disalin.');
+    f.isi.value = f.isi.value.trim() ? `${f.isi.value.replace(/\s+$/, '')}\n\n${teks}` : teks;
+    $('#dialog').close(); toast('Teks disalin ke isi naskah. Jangan lupa Simpan.');
+  };
+}
+async function dialogTranskrip() {
+  let data;
+  try { data = await api('/api/transkrip'); } catch (e) { return toast(e.message); }
+  const d = $('#dialog');
+  d.classList.add('lebar'); d.addEventListener('close', () => d.classList.remove('lebar'), { once: true });
+  d.innerHTML = `<div id="w-transkrip"><div class="baris antara"><h2 style="margin:0">Transkrip foto</h2>
+    <button class="btn kecil" type="button" onclick="$('#dialog').close()">Tutup</button></div>${htmlTranskrip(data, true)}</div>`;
+  d.showModal();
+  pasangTranskrip($('#w-transkrip'), true);
+}
+async function halTranskrip() {
+  const data = await api('/api/transkrip');
+  const wkt = s => new Date(s * 1000).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  setelahTampil = () => pasangTranskrip($('#w-transkrip'), false);
+  return `<h1>Transkrip Foto</h1><p class="sub">Ubah foto tulisan menjadi teks, periksa, lalu kirim ke Google Docs.</p>
+  <div class="kartu" id="w-transkrip">${htmlTranskrip(data, false)}</div>
+  <div class="kartu"><b>Riwayat transkrip${punya('admin', 'pemred') ? '' : ' saya'}</b>
+    ${data.riwayat.length ? `<div class="tabel-wadah"><table><tr><th>Waktu</th><th>Jenis</th><th>Dokumen</th><th>Judul</th><th>Foto</th><th>Karakter</th><th>Oleh</th></tr>
+    ${data.riwayat.map(r => `<tr><td style="white-space:nowrap">${wkt(r.waktu)}</td><td>${r.jenis === 'kirim' ? 'Kirim ke Docs' : 'Baca foto'}</td>
+      <td>${esc(r.dokumen || '—')}</td><td>${esc(r.judul || '—')}</td><td>${r.jumlah_foto || '—'}</td><td>${r.panjang}</td><td>${esc(r.oleh || '—')}</td></tr>`).join('')}
+    </table></div>` : '<div class="kosong">Belum ada.</div>'}</div>`;
 }
